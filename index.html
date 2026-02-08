@@ -931,7 +931,15 @@
 
   function moveTooltip(e) {
     // Position the tooltip near the mouse cursor
-    tooltipEl.style.left = (e.clientX + 16) + 'px';
+    const tooltipWidth = tooltipEl.offsetWidth || 260;
+    const viewportWidth = window.innerWidth;
+    const spaceOnRight = viewportWidth - e.clientX;
+    
+    if (spaceOnRight < tooltipWidth + 32) {
+      tooltipEl.style.left = (e.clientX - tooltipWidth - 16) + 'px';
+    } else {
+      tooltipEl.style.left = (e.clientX + 16) + 'px';
+    }
     tooltipEl.style.top = (e.clientY - 10) + 'px';
   }
 
