@@ -287,6 +287,48 @@
   .tooltip-title { font-weight: 600; color: var(--accent-blue); margin-bottom: 4px; font-size: 0.82rem; }
 
   .footer { text-align: center; margin-top: 44px; padding-top: 20px; border-top: 1px solid var(--border-subtle); color: var(--text-muted); font-size: 0.78rem; }
+
+  /* ============================
+     MOBILE OPTIMIZATIONS
+     ============================ */
+  @media (max-width: 768px) {
+    .nav-inner {
+      height: auto;
+      min-height: 52px;
+      flex-wrap: wrap;
+      padding: 8px 0;
+      gap: 8px;
+    }
+    .nav-brand { font-size: 0.7rem; }
+    .nav-links {
+      width: 100%;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 2px;
+    }
+    .nav-link { font-size: 0.72rem; padding: 5px 8px; }
+    .nav-sep { display: none; }
+    .container { padding: 24px 16px; }
+    .header { margin-bottom: 32px; }
+    .header h1 { font-size: 1.5rem; }
+    .header .subtitle { font-size: 0.7rem; letter-spacing: 2px; }
+    .header p { font-size: 0.9rem; }
+    .diagram-section { padding: 20px 8px 16px; border-radius: 12px; }
+    .diagram-svg { min-height: 300px; }
+    .controls { flex-direction: column; gap: 10px; }
+    .btn { width: 100%; padding: 12px 16px; font-size: 0.78rem; }
+    .step-card, .layer-card, .concept-card { padding: 20px 16px; }
+    .step-title, .layer-title { font-size: 1rem; }
+    .step-desc, .layer-desc { font-size: 0.85rem; }
+    .footer { font-size: 0.7rem; margin-top: 32px; }
+  }
+  @media (max-width: 480px) {
+    .nav-bar { padding: 0 12px; }
+    .nav-link { font-size: 0.68rem; padding: 4px 6px; }
+    .header h1 { font-size: 1.3rem; }
+    .container { padding: 16px 12px; }
+  }
+
 </style>
 </head>
 <body>
