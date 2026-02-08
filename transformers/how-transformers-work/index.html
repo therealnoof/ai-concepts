@@ -1,0 +1,1080 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>How Transformers Work — The Architecture Behind LLMs</title>
+
+<!-- Font pairing: DM Sans for body, Fira Code for technical labels -->
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+
+<style>
+  /* ============================
+     CSS VARIABLES
+     Deep emerald/jade theme — rich greens with
+     electric mint accents on a near-black background
+     ============================ */
+  :root {
+    --bg-deep: #060d0b;
+    --bg-panel: #0a1612;
+    --bg-card: #0f1f1a;
+    --text-primary: #d8ece4;
+    --text-secondary: #8aab9e;
+    --text-muted: #5a7a6e;
+    --accent-emerald: #34d399;
+    --accent-mint: #6ee7b7;
+    --accent-jade: #2cb87a;
+    --accent-lime: #a3e635;
+    --accent-sky: #38bdf8;
+    --accent-violet: #a78bfa;
+    --accent-rose: #fb7185;
+    --accent-amber: #fbbf24;
+    --glow-emerald: rgba(52, 211, 153, 0.25);
+    --glow-mint: rgba(110, 231, 183, 0.2);
+    --border-subtle: rgba(138, 171, 158, 0.12);
+    --border-emerald: rgba(52, 211, 153, 0.25);
+  }
+
+  /* ============================
+     RESET & BASE
+     ============================ */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg-deep);
+    color: var(--text-primary);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ============================
+     NAVIGATION BAR
+     Same sticky nav structure as the other pages,
+     adapted to use this page's emerald color palette.
+     ============================ */
+  .nav-bar {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: rgba(6, 13, 11, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border-subtle);
+    padding: 0 24px;
+  }
+
+  .nav-inner {
+    max-width: 1100px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 52px;
+  }
+
+  .nav-brand {
+    font-family: 'Fira Code', monospace;
+    font-size: 0.8rem;
+    color: var(--accent-emerald);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    opacity: 0.8;
+    text-decoration: none;
+    transition: opacity 0.2s ease;
+  }
+
+  .nav-brand:hover { opacity: 1; }
+
+  .nav-links {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .nav-link {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 400;
+    color: var(--text-secondary);
+    text-decoration: none;
+    padding: 6px 14px;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+    letter-spacing: 0.2px;
+  }
+
+  .nav-link:hover {
+    color: var(--text-primary);
+    background: rgba(138, 171, 158, 0.08);
+  }
+
+  .nav-link.active {
+    color: var(--accent-emerald);
+    background: rgba(52, 211, 153, 0.08);
+  }
+
+  .nav-sep {
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    opacity: 0.4;
+    margin: 0 4px;
+  }
+
+  /* ============================
+     CONTAINER
+     ============================ */
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 40px 24px;
+  }
+
+  /* ============================
+     HEADER
+     ============================ */
+  .header {
+    text-align: center;
+    margin-bottom: 48px;
+  }
+
+  .header h1 {
+    font-size: 2.2rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--accent-emerald), var(--accent-mint), var(--accent-jade));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 8px;
+    letter-spacing: -0.5px;
+  }
+
+  .header .subtitle {
+    font-family: 'Fira Code', monospace;
+    font-size: 0.82rem;
+    color: var(--accent-jade);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    opacity: 0.7;
+    margin-bottom: 14px;
+  }
+
+  .header p {
+    color: var(--text-secondary);
+    font-size: 1.05rem;
+    font-weight: 300;
+    max-width: 680px;
+    margin: 0 auto;
+    line-height: 1.7;
+  }
+
+  /* ============================
+     MAIN DIAGRAM SECTION
+     ============================ */
+  .diagram-section {
+    background: var(--bg-panel);
+    border: 1px solid var(--border-subtle);
+    border-radius: 20px;
+    padding: 36px 20px 28px;
+    margin-bottom: 36px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Hexagonal grid background pattern */
+  .diagram-section::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      radial-gradient(circle at 1px 1px, rgba(52, 211, 153, 0.04) 1px, transparent 0);
+    background-size: 28px 28px;
+    pointer-events: none;
+  }
+
+  .diagram-svg {
+    width: 100%;
+    height: auto;
+    display: block;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* ============================
+     PIPELINE NODE STYLES
+     ============================ */
+  @keyframes nodeGlow {
+    0% { filter: drop-shadow(0 0 0px transparent); }
+    30% { filter: drop-shadow(0 0 15px var(--glow-emerald)); }
+    100% { filter: drop-shadow(0 0 0px transparent); }
+  }
+
+  .arch-node {
+    cursor: pointer;
+    transition: filter 0.3s ease;
+  }
+
+  .arch-node:hover {
+    filter: drop-shadow(0 0 12px var(--glow-emerald));
+  }
+
+  .arch-node.active {
+    animation: nodeGlow 0.8s ease-out forwards;
+  }
+
+  /* Arrow activation animation */
+  @keyframes arrowPulse {
+    0% { stroke-opacity: 0.15; }
+    40% { stroke-opacity: 0.9; }
+    100% { stroke-opacity: 0.15; }
+  }
+
+  .flow-arrow.active {
+    animation: arrowPulse 0.6s ease-out forwards;
+    stroke-width: 2.5 !important;
+  }
+
+  /* ============================
+     CONTROLS
+     ============================ */
+  .controls {
+    display: flex;
+    justify-content: center;
+    gap: 14px;
+    margin-top: 22px;
+    position: relative;
+    z-index: 2;
+    flex-wrap: wrap;
+  }
+
+  .btn {
+    font-family: 'Fira Code', monospace;
+    font-size: 0.82rem;
+    padding: 11px 24px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    letter-spacing: 0.5px;
+    border: 1px solid;
+  }
+
+  .btn-walk {
+    background: linear-gradient(135deg, rgba(52, 211, 153, 0.15), rgba(44, 184, 122, 0.15));
+    border-color: rgba(52, 211, 153, 0.35);
+    color: var(--accent-emerald);
+  }
+
+  .btn-walk:hover {
+    background: linear-gradient(135deg, rgba(52, 211, 153, 0.25), rgba(44, 184, 122, 0.25));
+    border-color: var(--accent-emerald);
+    box-shadow: 0 0 20px rgba(52, 211, 153, 0.15);
+  }
+
+  .btn-attention {
+    background: linear-gradient(135deg, rgba(167, 139, 250, 0.12), rgba(56, 189, 248, 0.12));
+    border-color: rgba(167, 139, 250, 0.3);
+    color: var(--accent-violet);
+  }
+
+  .btn-attention:hover {
+    background: linear-gradient(135deg, rgba(167, 139, 250, 0.22), rgba(56, 189, 248, 0.22));
+    border-color: var(--accent-violet);
+    box-shadow: 0 0 20px rgba(167, 139, 250, 0.15);
+  }
+
+  .btn:active { transform: scale(0.97); }
+
+  /* Status bar for walkthrough */
+  .status-bar {
+    text-align: center;
+    margin-top: 16px;
+    font-family: 'Fira Code', monospace;
+    font-size: 0.82rem;
+    color: var(--accent-emerald);
+    min-height: 24px;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    position: relative;
+    z-index: 2;
+  }
+
+  .status-bar.visible { opacity: 1; }
+
+  /* ============================
+     STEP DETAIL CARDS
+     ============================ */
+  .steps-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 18px;
+    margin-top: 36px;
+  }
+
+  @media (min-width: 768px) {
+    .steps-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  .step-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: 14px;
+    padding: 24px;
+    position: relative;
+    transition: all 0.3s ease;
+    overflow: hidden;
+  }
+
+  .step-card::before {
+    content: '';
+    position: absolute;
+    top: 16px;
+    bottom: 16px;
+    left: 0;
+    width: 3px;
+    border-radius: 0 3px 3px 0;
+  }
+
+  .step-card:nth-child(1)::before { background: var(--accent-emerald); }
+  .step-card:nth-child(2)::before { background: var(--accent-mint); }
+  .step-card:nth-child(3)::before { background: var(--accent-violet); }
+  .step-card:nth-child(4)::before { background: var(--accent-sky); }
+  .step-card:nth-child(5)::before { background: var(--accent-amber); }
+  .step-card:nth-child(6)::before { background: var(--accent-rose); }
+  .step-card:nth-child(7)::before { background: var(--accent-jade); }
+  .step-card:nth-child(8)::before { background: var(--accent-lime); }
+
+  .step-card:hover {
+    border-color: var(--border-emerald);
+    transform: translateY(-2px);
+  }
+
+  .step-num {
+    font-family: 'Fira Code', monospace;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .step-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+  }
+
+  .step-desc {
+    color: var(--text-secondary);
+    font-weight: 300;
+    font-size: 0.92rem;
+    line-height: 1.65;
+  }
+
+  .step-example {
+    margin-top: 12px;
+    padding: 10px 14px;
+    background: rgba(52, 211, 153, 0.06);
+    border-left: 2px solid var(--accent-jade);
+    border-radius: 0 8px 8px 0;
+    font-size: 0.82rem;
+    color: var(--accent-mint);
+    font-family: 'Fira Code', monospace;
+    line-height: 1.5;
+  }
+
+  /* ============================
+     ATTENTION DEMO PANEL
+     Interactive panel showing how self-attention works
+     ============================ */
+  .attention-panel {
+    display: none;
+    margin-top: 36px;
+    border: 1px solid var(--border-subtle);
+    border-radius: 14px;
+    overflow: hidden;
+    background: var(--bg-card);
+  }
+
+  .attention-panel.visible { display: block; }
+
+  .attention-header {
+    background: rgba(167, 139, 250, 0.08);
+    padding: 16px 24px;
+    font-weight: 600;
+    font-size: 1rem;
+    border-bottom: 1px solid var(--border-subtle);
+    color: var(--accent-violet);
+  }
+
+  .attention-body {
+    padding: 28px 24px;
+  }
+
+  .attention-sentence {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    margin-bottom: 24px;
+  }
+
+  /* Individual word tokens in the attention demo */
+  .attn-word {
+    font-family: 'Fira Code', monospace;
+    font-size: 1rem;
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: 1px solid var(--border-subtle);
+    background: var(--bg-panel);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+  }
+
+  .attn-word:hover {
+    border-color: var(--accent-violet);
+  }
+
+  /* When a word is selected, it glows */
+  .attn-word.selected {
+    border-color: var(--accent-violet);
+    background: rgba(167, 139, 250, 0.15);
+    box-shadow: 0 0 12px rgba(167, 139, 250, 0.2);
+    color: #fff;
+  }
+
+  /* Attention strength indicator bar under each word */
+  .attn-bar {
+    position: absolute;
+    bottom: -4px;
+    left: 10%;
+    right: 10%;
+    height: 3px;
+    border-radius: 2px;
+    background: var(--accent-violet);
+    transform: scaleX(0);
+    transform-origin: center;
+    transition: transform 0.4s ease, opacity 0.4s ease;
+    opacity: 0;
+  }
+
+  .attn-word.attended .attn-bar {
+    opacity: 1;
+  }
+
+  .attention-explanation {
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 0.88rem;
+    line-height: 1.6;
+    font-weight: 300;
+    max-width: 600px;
+    margin: 0 auto;
+  }
+
+  .attention-instruction {
+    text-align: center;
+    font-family: 'Fira Code', monospace;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+    letter-spacing: 0.5px;
+  }
+
+  /* ============================
+     TOOLTIP
+     ============================ */
+  .tooltip {
+    position: fixed;
+    background: #0f2920;
+    border: 1px solid var(--border-emerald);
+    color: var(--text-primary);
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-size: 0.8rem;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    z-index: 100;
+    max-width: 250px;
+    font-family: 'DM Sans', sans-serif;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  }
+
+  .tooltip.visible { opacity: 1; }
+
+  .tooltip-title {
+    font-weight: 600;
+    color: var(--accent-emerald);
+    margin-bottom: 4px;
+    font-size: 0.82rem;
+  }
+
+  /* ============================
+     FOOTER
+     ============================ */
+  .footer {
+    text-align: center;
+    margin-top: 44px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border-subtle);
+    color: var(--text-muted);
+    font-size: 0.78rem;
+  }
+</style>
+</head>
+<body>
+
+<!-- ============================
+     NAVIGATION BAR
+     "Transformers" is marked active on this page.
+     ============================ -->
+<nav class="nav-bar">
+  <div class="nav-inner">
+    <a href="/" class="nav-brand">⚡ AI Concepts</a>
+    <div class="nav-links">
+      <a href="/" class="nav-link">Neural Networks</a>
+      <div class="nav-sep"></div>
+      <a href="/rag/how-rag-works" class="nav-link">How RAG Works</a>
+      <div class="nav-sep"></div>
+      <a href="/transformers/how-transformers-work" class="nav-link active">Transformers</a>
+      <!-- Add more links here:
+      <div class="nav-sep"></div>
+      <a href="/prompt-injection" class="nav-link">Prompt Injection</a>
+      -->
+    </div>
+  </div>
+</nav>
+
+<!-- Tooltip element -->
+<div class="tooltip" id="tooltip">
+  <div class="tooltip-title" id="tooltip-title"></div>
+  <div id="tooltip-text"></div>
+</div>
+
+<div class="container">
+
+  <!-- ============================
+       HEADER
+       ============================ -->
+  <div class="header">
+    <div class="subtitle">The Engine Behind Modern AI</div>
+    <h1>How Transformers Work</h1>
+    <p>Transformers are the architecture that powers ChatGPT, Claude, and every major LLM. Their secret weapon is <strong>self-attention</strong> — the ability to look at all words in a sentence simultaneously and understand how they relate to each other.</p>
+  </div>
+
+  <!-- ============================
+       MAIN ARCHITECTURE DIAGRAM (SVG)
+       
+       Shows the Transformer pipeline:
+       
+       [Input Text] → [Tokenizer] → [Embeddings + Position]
+                                            ↓
+                                    [Self-Attention]
+                                            ↓
+                                    [Feed-Forward NN]
+                                            ↓
+                                      [× N Layers]
+                                            ↓
+                                    [Output Projection]
+                                            ↓
+                                    [Predicted Token]
+       ============================ -->
+  <div class="diagram-section">
+    <svg class="diagram-svg" viewBox="0 0 960 680" xmlns="http://www.w3.org/2000/svg" id="transformer-svg">
+
+      <defs>
+        <marker id="arr-green" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#34d399" opacity="0.6" />
+        </marker>
+        <!-- Repeat block bracket -->
+        <marker id="arr-lime" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#a3e635" opacity="0.6" />
+        </marker>
+      </defs>
+
+      <!-- ============================
+           CONNECTION ARROWS (vertical flow, top to bottom)
+           ============================ -->
+
+      <!-- Arrow: Input → Tokenizer -->
+      <line class="flow-arrow" id="fa-1" x1="480" y1="68" x2="480" y2="98"
+        stroke="#34d399" stroke-opacity="0.15" stroke-width="1.5" marker-end="url(#arr-green)" />
+
+      <!-- Arrow: Tokenizer → Embeddings -->
+      <line class="flow-arrow" id="fa-2" x1="480" y1="148" x2="480" y2="178"
+        stroke="#34d399" stroke-opacity="0.15" stroke-width="1.5" marker-end="url(#arr-green)" />
+
+      <!-- Arrow: Embeddings → Self-Attention -->
+      <line class="flow-arrow" id="fa-3" x1="480" y1="238" x2="480" y2="278"
+        stroke="#34d399" stroke-opacity="0.15" stroke-width="1.5" marker-end="url(#arr-green)" />
+
+      <!-- Arrow: Self-Attention → Feed-Forward -->
+      <line class="flow-arrow" id="fa-4" x1="480" y1="358" x2="480" y2="398"
+        stroke="#34d399" stroke-opacity="0.15" stroke-width="1.5" marker-end="url(#arr-green)" />
+
+      <!-- Arrow: Feed-Forward → Output Projection -->
+      <line class="flow-arrow" id="fa-5" x1="480" y1="468" x2="480" y2="508"
+        stroke="#34d399" stroke-opacity="0.15" stroke-width="1.5" marker-end="url(#arr-green)" />
+
+      <!-- Arrow: Output Projection → Predicted Token -->
+      <line class="flow-arrow" id="fa-6" x1="480" y1="568" x2="480" y2="598"
+        stroke="#34d399" stroke-opacity="0.15" stroke-width="1.5" marker-end="url(#arr-green)" />
+
+      <!-- ============================
+           "× N LAYERS" REPEAT BRACKET
+           Shows that Self-Attention + Feed-Forward repeat many times
+           ============================ -->
+      <rect x="730" y="278" width="130" height="190" rx="10"
+        fill="none" stroke="rgba(163, 230, 53, 0.2)" stroke-width="1.5" stroke-dasharray="6 4" />
+      <text x="795" y="302" font-family="Fira Code" font-size="10" fill="#a3e635" text-anchor="middle" letter-spacing="1">REPEATED</text>
+      <text x="795" y="370" font-family="DM Sans" font-size="28" fill="#a3e635" text-anchor="middle" font-weight="700" opacity="0.7">× N</text>
+      <text x="795" y="392" font-family="Fira Code" font-size="9" fill="#5a7a6e" text-anchor="middle">layers</text>
+      <text x="795" y="418" font-family="Fira Code" font-size="8" fill="#5a7a6e" text-anchor="middle">GPT-4: ~120</text>
+      <text x="795" y="432" font-family="Fira Code" font-size="8" fill="#5a7a6e" text-anchor="middle">Claude: ~80+</text>
+      <text x="795" y="446" font-family="Fira Code" font-size="8" fill="#5a7a6e" text-anchor="middle">LLaMA 70B: 80</text>
+
+      <!-- Bracket connector lines -->
+      <line x1="710" y1="310" x2="730" y2="310" stroke="rgba(163, 230, 53, 0.2)" stroke-width="1" stroke-dasharray="4 3" />
+      <line x1="710" y1="440" x2="730" y2="440" stroke="rgba(163, 230, 53, 0.2)" stroke-width="1" stroke-dasharray="4 3" />
+
+      <!-- ============================
+           ARCHITECTURE NODES
+           ============================ -->
+
+      <!-- NODE 1: Input Text -->
+      <g class="arch-node" id="node-input"
+         data-tip-title="Input Text"
+         data-tip-text="Raw text enters the model — like 'The capital of France is'. The model will try to predict the next token.">
+        <rect x="350" y="28" width="260" height="40" rx="10"
+          fill="rgba(52, 211, 153, 0.06)" stroke="rgba(52, 211, 153, 0.3)" stroke-width="1.5" />
+        <text x="400" y="52" font-size="16">📝</text>
+        <text x="424" y="53" font-family="DM Sans" font-size="13" font-weight="600" fill="#d8ece4">Input Text</text>
+        <text x="563" y="53" font-family="Fira Code" font-size="8" fill="#5a7a6e" letter-spacing="1">STEP 1</text>
+      </g>
+
+      <!-- NODE 2: Tokenizer -->
+      <g class="arch-node" id="node-tokenizer"
+         data-tip-title="Tokenizer"
+         data-tip-text="Splits text into tokens — subword pieces like 'capital', 'of', 'France'. Each token gets a numerical ID. 'unhappiness' might become ['un', 'happiness'].">
+        <rect x="330" y="100" width="300" height="48" rx="10"
+          fill="rgba(110, 231, 183, 0.06)" stroke="rgba(110, 231, 183, 0.3)" stroke-width="1.5" />
+        <text x="370" y="128" font-size="16">✂️</text>
+        <text x="396" y="128" font-family="DM Sans" font-size="13" font-weight="600" fill="#d8ece4">Tokenizer</text>
+        <!-- Show example tokens -->
+        <text x="500" y="128" font-family="Fira Code" font-size="9" fill="#5a7a6e">
+          ["The", "capital", "of", "France", "is"]
+        </text>
+        <text x="598" y="140" font-family="Fira Code" font-size="8" fill="#5a7a6e" letter-spacing="1">STEP 2</text>
+      </g>
+
+      <!-- NODE 3: Embeddings + Positional Encoding -->
+      <g class="arch-node" id="node-embed"
+         data-tip-title="Embeddings + Position"
+         data-tip-text="Each token ID is converted to a vector (list of numbers capturing meaning). Positional encoding is added so the model knows word ORDER — 'dog bites man' vs 'man bites dog'.">
+        <rect x="310" y="180" width="340" height="58" rx="10"
+          fill="rgba(52, 211, 153, 0.06)" stroke="rgba(52, 211, 153, 0.3)" stroke-width="1.5" />
+        <text x="350" y="208" font-size="16">🔢</text>
+        <text x="376" y="206" font-family="DM Sans" font-size="13" font-weight="600" fill="#d8ece4">Embeddings + Positional Encoding</text>
+        <text x="376" y="225" font-family="Fira Code" font-size="9" fill="#5a7a6e">meaning vector + word order info</text>
+        <text x="614" y="230" font-family="Fira Code" font-size="8" fill="#5a7a6e" letter-spacing="1">STEP 3</text>
+      </g>
+
+      <!-- NODE 4: Self-Attention (the key innovation!) -->
+      <g class="arch-node" id="node-attention"
+         data-tip-title="Self-Attention ⭐"
+         data-tip-text="THE key innovation! Each token looks at EVERY other token and decides how much to 'pay attention' to it. 'It' in 'The cat sat because it was tired' learns to attend to 'cat'.">
+        <rect x="290" y="280" width="380" height="78" rx="12"
+          fill="rgba(167, 139, 250, 0.08)" stroke="rgba(167, 139, 250, 0.35)" stroke-width="2" />
+        <!-- Star decoration to emphasize importance -->
+        <text x="330" y="316" font-size="20">⭐</text>
+        <text x="358" y="314" font-family="DM Sans" font-size="15" font-weight="700" fill="#d8ece4">Self-Attention</text>
+        <text x="358" y="334" font-family="Fira Code" font-size="9" fill="#8aab9e">"Which words should I focus on?"</text>
+        <text x="358" y="350" font-family="Fira Code" font-size="8" fill="#5a7a6e">Q (Query) × K (Key) → Attention Weights → V (Value)</text>
+        <text x="634" y="350" font-family="Fira Code" font-size="8" fill="#5a7a6e" letter-spacing="1">STEP 4</text>
+      </g>
+
+      <!-- Multi-head annotation -->
+      <g>
+        <rect x="100" y="295" width="150" height="48" rx="8"
+          fill="none" stroke="rgba(167, 139, 250, 0.2)" stroke-width="1" stroke-dasharray="4 3" />
+        <text x="175" y="314" font-family="Fira Code" font-size="9" fill="#a78bfa" text-anchor="middle">MULTI-HEAD</text>
+        <text x="175" y="330" font-family="Fira Code" font-size="8" fill="#5a7a6e" text-anchor="middle">8-128 parallel heads</text>
+        <text x="175" y="340" font-family="Fira Code" font-size="8" fill="#5a7a6e" text-anchor="middle">each learns different</text>
+        <!-- Connector line to the attention node -->
+        <line x1="250" y1="319" x2="290" y2="319" stroke="rgba(167, 139, 250, 0.2)" stroke-width="1" stroke-dasharray="4 3" />
+      </g>
+
+      <!-- NODE 5: Feed-Forward Neural Network -->
+      <g class="arch-node" id="node-ffn"
+         data-tip-title="Feed-Forward Network"
+         data-tip-text="After attention, each token passes through a small neural network independently. This processes and transforms the attention output into richer representations.">
+        <rect x="310" y="400" width="340" height="68" rx="10"
+          fill="rgba(56, 189, 248, 0.06)" stroke="rgba(56, 189, 248, 0.3)" stroke-width="1.5" />
+        <text x="350" y="432" font-size="16">🧮</text>
+        <text x="376" y="430" font-family="DM Sans" font-size="13" font-weight="600" fill="#d8ece4">Feed-Forward Neural Network</text>
+        <text x="376" y="450" font-family="Fira Code" font-size="9" fill="#5a7a6e">process each token independently</text>
+        <text x="614" y="460" font-family="Fira Code" font-size="8" fill="#5a7a6e" letter-spacing="1">STEP 5</text>
+      </g>
+
+      <!-- NODE 6: Output Projection -->
+      <g class="arch-node" id="node-output"
+         data-tip-title="Output Projection"
+         data-tip-text="Maps the final hidden state back to vocabulary size — producing a score for every possible next token (50,000+ words). Called 'logits'.">
+        <rect x="320" y="510" width="320" height="58" rx="10"
+          fill="rgba(251, 191, 36, 0.06)" stroke="rgba(251, 191, 36, 0.3)" stroke-width="1.5" />
+        <text x="360" y="542" font-size="16">📊</text>
+        <text x="386" y="538" font-family="DM Sans" font-size="13" font-weight="600" fill="#d8ece4">Output Projection</text>
+        <text x="386" y="558" font-family="Fira Code" font-size="9" fill="#5a7a6e">score every possible next word</text>
+        <text x="604" y="560" font-family="Fira Code" font-size="8" fill="#5a7a6e" letter-spacing="1">STEP 6</text>
+      </g>
+
+      <!-- NODE 7: Predicted Token -->
+      <g class="arch-node" id="node-predict"
+         data-tip-title="Predicted Token"
+         data-tip-text="The highest-scoring token is selected (or sampled with temperature). 'The capital of France is' → 'Paris'. This token gets fed back in to predict the NEXT one.">
+        <rect x="360" y="600" width="240" height="50" rx="10"
+          fill="rgba(52, 211, 153, 0.1)" stroke="rgba(52, 211, 153, 0.4)" stroke-width="1.5" />
+        <text x="400" y="630" font-size="16">✅</text>
+        <text x="428" y="628" font-family="DM Sans" font-size="13" font-weight="700" fill="#d8ece4">"Paris"</text>
+        <text x="500" y="628" font-family="Fira Code" font-size="9" fill="#5a7a6e">→ next token</text>
+        <text x="564" y="642" font-family="Fira Code" font-size="8" fill="#5a7a6e" letter-spacing="1">STEP 7</text>
+      </g>
+
+      <!-- Autoregressive loop arrow (output feeds back to input) -->
+      <path d="M 600 625 Q 700 625, 700 660 Q 700 670, 480 670 Q 260 670, 260 625 Q 260 48, 345 48"
+        fill="none" stroke="rgba(52, 211, 153, 0.15)" stroke-width="1" stroke-dasharray="5 4"
+        marker-end="url(#arr-green)" />
+      <text x="700" y="665" font-family="Fira Code" font-size="8" fill="#5a7a6e" text-anchor="middle">AUTOREGRESSIVE LOOP</text>
+      <text x="260" y="400" font-family="Fira Code" font-size="7" fill="#5a7a6e" text-anchor="middle" transform="rotate(-90, 260, 400)">feeds back as new input</text>
+
+    </svg>
+
+    <!-- Controls -->
+    <div class="controls">
+      <button class="btn btn-walk" id="btn-walk" onclick="walkthrough()">▶ Walk Through the Architecture</button>
+      <button class="btn btn-attention" id="btn-attn" onclick="toggleAttention()">🔍 Interactive Attention Demo</button>
+    </div>
+
+    <div class="status-bar" id="status-bar"></div>
+  </div>
+
+  <!-- ============================
+       INTERACTIVE ATTENTION DEMO
+       Click a word to see what it "attends to"
+       ============================ -->
+  <div class="attention-panel" id="attention-panel">
+    <div class="attention-header">🔍 &nbsp;Self-Attention — Click a word to see what it focuses on</div>
+    <div class="attention-body">
+      <div class="attention-instruction">Click any word below to see its attention pattern</div>
+      <div class="attention-sentence" id="attn-sentence">
+        <!-- Words are generated by JavaScript below -->
+      </div>
+      <div class="attention-explanation" id="attn-explanation">
+        Click a word to see which other words it "pays attention to" when understanding the sentence.
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================
+       STEP-BY-STEP DETAIL CARDS
+       ============================ -->
+  <div class="steps-grid">
+
+    <div class="step-card">
+      <div class="step-num">Step 01</div>
+      <div class="step-title">📝 Input Text</div>
+      <div class="step-desc">
+        Raw text enters the model. For a generative LLM, the goal is to predict the <strong>next token</strong> — one word (or subword) at a time. The entire output is generated token by token.
+      </div>
+      <div class="step-example">
+        "The capital of France is" → model predicts → "Paris"
+      </div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-num">Step 02</div>
+      <div class="step-title">✂️ Tokenizer</div>
+      <div class="step-desc">
+        Text is split into <strong>tokens</strong> — subword units. Common words stay whole, but rare words get broken into pieces. Each token is assigned a numerical ID from the model's vocabulary (typically 30K-100K tokens).
+      </div>
+      <div class="step-example">
+        "unhappiness" → ["un", "happi", "ness"] → [348, 12902, 655]
+      </div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-num">Step 03</div>
+      <div class="step-title">🔢 Embeddings + Position</div>
+      <div class="step-desc">
+        Each token ID gets converted into an <strong>embedding vector</strong> — a long list of numbers capturing its meaning. <strong>Positional encoding</strong> is added so the model knows word <em>order</em>, since unlike RNNs, transformers see all tokens at once.
+      </div>
+      <div class="step-example">
+        Without position info, "dog bites man" and "man bites dog" would look identical to the model!
+      </div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-num">Step 04</div>
+      <div class="step-title">⭐ Self-Attention</div>
+      <div class="step-desc">
+        The core innovation. Each token creates three vectors: <strong>Query</strong> (what am I looking for?), <strong>Key</strong> (what do I contain?), and <strong>Value</strong> (what info do I provide?). By comparing Queries to Keys, the model learns which words are relevant to each other. <strong>Multi-head</strong> attention runs this in parallel 8-128 times, each head learning different relationships (grammar, meaning, context).
+      </div>
+      <div class="step-example">
+        In "The cat sat on the mat because it was soft" — the word "it" attends strongly to "mat" (what's soft).
+      </div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-num">Step 05</div>
+      <div class="step-title">🧮 Feed-Forward Network</div>
+      <div class="step-desc">
+        After attention, each token independently passes through a small neural network (usually 2 layers). This is where the model stores much of its learned "knowledge" — facts, patterns, and associations encoded in the network weights.
+      </div>
+      <div class="step-example">
+        Think of attention as "gathering context" and feed-forward as "processing that context into useful knowledge."
+      </div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-num">Step 06</div>
+      <div class="step-title">🔄 Repeat × N Layers</div>
+      <div class="step-desc">
+        Steps 4-5 (attention → feed-forward) repeat through many stacked layers. Early layers capture basic patterns (grammar, syntax). Middle layers learn relationships and facts. Deep layers handle complex reasoning and nuance.
+      </div>
+      <div class="step-example">
+        GPT-4 has ~120 layers. Claude has 80+. Each layer refines understanding further — like multiple rounds of review.
+      </div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-num">Step 07</div>
+      <div class="step-title">📊 Output Projection</div>
+      <div class="step-desc">
+        The final layer's output is projected to a vector with one score per vocabulary word (50,000+ scores). These raw scores are called <strong>logits</strong>. A <strong>softmax</strong> function converts them to probabilities that sum to 1.
+      </div>
+      <div class="step-example">
+        "Paris": 0.72, "Lyon": 0.08, "Berlin": 0.03, ... — "Paris" has the highest probability.
+      </div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-num">Step 08</div>
+      <div class="step-title">✅ Token Selection &amp; Loop</div>
+      <div class="step-desc">
+        A token is selected based on the probabilities. The <strong>temperature</strong> setting controls randomness — low temperature picks the top word reliably, high temperature introduces creativity. The selected token feeds back as input to predict the <em>next</em> token. This repeats until the model generates a stop token or hits the max length.
+      </div>
+      <div class="step-example">
+        This is why LLMs generate one word at a time — it's an autoregressive loop!
+      </div>
+    </div>
+
+  </div>
+
+  <div class="footer">
+    Interactive Transformer Architecture Diagram — Hover over blocks for details, walk through the pipeline, or try the attention demo
+  </div>
+</div>
+
+<script>
+  // ============================
+  // TOOLTIP FUNCTIONALITY
+  // ============================
+  const tooltipEl = document.getElementById('tooltip');
+  const tooltipTitle = document.getElementById('tooltip-title');
+  const tooltipText = document.getElementById('tooltip-text');
+
+  document.querySelectorAll('.arch-node').forEach(node => {
+    node.addEventListener('mouseenter', () => {
+      tooltipTitle.textContent = node.getAttribute('data-tip-title');
+      tooltipText.textContent = node.getAttribute('data-tip-text');
+      tooltipEl.classList.add('visible');
+    });
+    node.addEventListener('mousemove', (e) => {
+      tooltipEl.style.left = (e.clientX + 16) + 'px';
+      tooltipEl.style.top = (e.clientY - 10) + 'px';
+    });
+    node.addEventListener('mouseleave', () => {
+      tooltipEl.classList.remove('visible');
+    });
+  });
+
+  // ============================
+  // WALKTHROUGH ANIMATION
+  // Steps through the architecture top to bottom
+  // ============================
+  let isWalking = false;
+
+  const walkthroughSteps = [
+    { nodeId: 'node-input',     arrowIds: ['fa-1'],  status: '📝 Step 1: Raw text enters the model...' },
+    { nodeId: 'node-tokenizer', arrowIds: ['fa-2'],  status: '✂️ Step 2: Text is split into tokens (subword pieces)...' },
+    { nodeId: 'node-embed',     arrowIds: ['fa-3'],  status: '🔢 Step 3: Tokens become vectors + positional info added...' },
+    { nodeId: 'node-attention', arrowIds: ['fa-4'],  status: '⭐ Step 4: Self-Attention — every token looks at every other token...' },
+    { nodeId: 'node-ffn',       arrowIds: ['fa-5'],  status: '🧮 Step 5: Feed-forward network processes each token...' },
+    { nodeId: 'node-output',    arrowIds: ['fa-6'],  status: '📊 Step 6: Scores generated for every possible next word...' },
+    { nodeId: 'node-predict',   arrowIds: [],        status: '✅ Step 7: Highest-scoring token is selected → "Paris"!' },
+  ];
+
+  function walkthrough() {
+    if (isWalking) return;
+    isWalking = true;
+
+    const btn = document.getElementById('btn-walk');
+    const statusBar = document.getElementById('status-bar');
+    btn.textContent = '▶ Walking through...';
+    btn.style.opacity = '0.6';
+    statusBar.classList.add('visible');
+
+    walkthroughSteps.forEach((step, idx) => {
+      const delay = idx * 1100;
+
+      setTimeout(() => {
+        statusBar.textContent = step.status;
+
+        const node = document.getElementById(step.nodeId);
+        node.classList.add('active');
+        setTimeout(() => node.classList.remove('active'), 900);
+
+        step.arrowIds.forEach(arrowId => {
+          const arrow = document.getElementById(arrowId);
+          arrow.classList.add('active');
+          setTimeout(() => arrow.classList.remove('active'), 800);
+        });
+      }, delay);
+    });
+
+    const totalTime = walkthroughSteps.length * 1100 + 900;
+    setTimeout(() => {
+      btn.textContent = '▶ Walk Through the Architecture';
+      btn.style.opacity = '1';
+      statusBar.textContent = '🎉 Complete! The output feeds back in to predict the next token.';
+      setTimeout(() => statusBar.classList.remove('visible'), 3000);
+      isWalking = false;
+    }, totalTime);
+  }
+
+  // ============================
+  // INTERACTIVE ATTENTION DEMO
+  // Lets the user click a word to see what it "attends to"
+  //
+  // Each word has pre-defined attention weights to other words.
+  // These are simplified for demonstration — real attention is
+  // computed mathematically, but this shows the concept.
+  // ============================
+
+  // The sentence for the demo
+  const sentence = "The cat sat on the mat because it was soft";
+  const words = sentence.split(' ');
+
+  // Attention patterns: for each word index, which other word indices
+  // does it attend to most strongly?
+  // Format: { targetIndex: strengthPercent }
+  // These are simplified/illustrative — real models compute this dynamically
+  const attentionMap = {
+    0: { 1: 70, 5: 30 },                     // "The" → looks at "cat" and "mat"
+    1: { 0: 40, 2: 35, 7: 25 },             // "cat" → "The", "sat", "it"
+    2: { 1: 50, 3: 25, 4: 10, 5: 15 },      // "sat" → "cat", "on", "the", "mat"
+    3: { 2: 30, 5: 50, 4: 20 },             // "on" → "sat", "mat", "the"
+    4: { 5: 80, 3: 20 },                     // "the" → "mat", "on"
+    5: { 3: 25, 4: 30, 9: 35, 2: 10 },      // "mat" → "on", "the", "soft", "sat"
+    6: { 7: 50, 5: 25, 9: 25 },             // "because" → "it", "mat", "soft"
+    7: { 5: 60, 1: 25, 9: 15 },             // "it" → "mat" (resolves pronoun!), "cat", "soft"
+    8: { 9: 55, 7: 30, 5: 15 },             // "was" → "soft", "it", "mat"
+    9: { 5: 65, 7: 20, 8: 15 },             // "soft" → "mat", "it", "was"
+  };
+
+  // Build the clickable word elements
+  const sentenceContainer = document.getElementById('attn-sentence');
+  const explanationEl = document.getElementById('attn-explanation');
+
+  words.forEach((word, idx) => {
+    const wordEl = document.createElement('div');
+    wordEl.className = 'attn-word';
+    wordEl.textContent = word;
+    wordEl.dataset.index = idx;
+
+    // The bar underneath that shows attention strength
+    const bar = document.createElement('div');
+    bar.className = 'attn-bar';
+    wordEl.appendChild(bar);
+
+    // Click handler: show attention pattern for this word
+    wordEl.addEventListener('click', () => showAttention(idx));
+
+    sentenceContainer.appendChild(wordEl);
+  });
+
+  function showAttention(selectedIdx) {
+    const allWords = sentenceContainer.querySelectorAll('.attn-word');
+
+    // Reset all words
+    allWords.forEach(w => {
+      w.classList.remove('selected', 'attended');
+      w.querySelector('.attn-bar').style.transform = 'scaleX(0)';
+      w.querySelector('.attn-bar').style.opacity = '0';
+    });
+
+    // Highlight the selected word
+    allWords[selectedIdx].classList.add('selected');
+
+    // Get the attention pattern for this word
+    const pattern = attentionMap[selectedIdx];
+
+    // Highlight attended words with proportional bar widths
+    if (pattern) {
+      Object.entries(pattern).forEach(([targetIdx, strength]) => {
+        const targetWord = allWords[parseInt(targetIdx)];
+        targetWord.classList.add('attended');
+        const bar = targetWord.querySelector('.attn-bar');
+        // Scale the bar width based on attention strength (0-100%)
+        bar.style.transform = `scaleX(${strength / 100})`;
+        bar.style.opacity = '1';
+        // Color intensity based on strength
+        bar.style.background = `rgba(167, 139, 250, ${0.4 + (strength / 100) * 0.6})`;
+      });
+
+      // Build explanation text
+      const selectedWord = words[selectedIdx];
+      const targets = Object.entries(pattern)
+        .sort((a, b) => b[1] - a[1])  // sort by strength descending
+        .map(([idx, strength]) => `"${words[idx]}" (${strength}%)`)
+        .join(', ');
+
+      // Special explanations for interesting attention patterns
+      const specialExplanations = {
+        7: `"it" pays the most attention to "mat" — this is how the model figures out that "it" refers to the mat, not the cat! This pronoun resolution is one of the most powerful things self-attention does.`,
+        9: `"soft" attends strongly to "mat" — the model connects the adjective to the noun it describes, understanding that the mat is what's soft.`,
+        6: `"because" looks ahead to "it" and "soft" to understand the reason being stated, and back to "mat" to connect the cause.`,
+      };
+
+      explanationEl.innerHTML = specialExplanations[selectedIdx] 
+        || `<strong>"${selectedWord}"</strong> attends to: ${targets}`;
+    }
+  }
+
+  // ============================
+  // TOGGLE ATTENTION PANEL
+  // ============================
+  function toggleAttention() {
+    const panel = document.getElementById('attention-panel');
+    const btn = document.getElementById('btn-attn');
+
+    if (panel.classList.contains('visible')) {
+      panel.classList.remove('visible');
+      btn.textContent = '🔍 Interactive Attention Demo';
+    } else {
+      panel.classList.add('visible');
+      btn.textContent = '🔍 Hide Attention Demo';
+      setTimeout(() => {
+        panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 100);
+    }
+  }
+</script>
+
+</body>
+</html>

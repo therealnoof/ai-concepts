@@ -1,0 +1,1061 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>How RAG Works — Retrieval-Augmented Generation</title>
+
+<!-- Distinctive font pairing: Sora for headings, IBM Plex Mono for technical labels -->
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<style>
+  /* ============================
+     CSS VARIABLES
+     Warm industrial blueprint theme — 
+     dark navy background with amber/gold accents
+     ============================ */
+  :root {
+    --bg-deep: #080c14;
+    --bg-panel: #0d1320;
+    --bg-card: #111a2e;
+    --text-primary: #e8e0d4;
+    --text-secondary: #a09888;
+    --text-muted: #6b6155;
+    --accent-amber: #f0a030;
+    --accent-gold: #d4a040;
+    --accent-warm: #e8853c;
+    --accent-teal: #40b8a0;
+    --accent-sky: #58a8d8;
+    --accent-rose: #d86070;
+    --glow-amber: rgba(240, 160, 48, 0.25);
+    --glow-teal: rgba(64, 184, 160, 0.25);
+    --border-subtle: rgba(160, 152, 136, 0.12);
+    --border-amber: rgba(240, 160, 48, 0.25);
+  }
+
+  /* ============================
+     RESET & BASE
+     ============================ */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg-deep);
+    color: var(--text-primary);
+    font-family: 'Sora', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ============================
+     NAVIGATION BAR
+     Same sticky nav structure as the Neural Networks page,
+     but adapted to use this page's amber/gold color palette.
+     Easy to add more links — just add more <a> tags.
+     ============================ */
+  .nav-bar {
+    position: sticky;            /* Sticks to top when scrolling */
+    top: 0;
+    z-index: 50;                 /* Sits above all other content */
+    background: rgba(8, 12, 20, 0.85);   /* Semi-transparent dark bg */
+    backdrop-filter: blur(12px);          /* Frosted glass blur effect */
+    -webkit-backdrop-filter: blur(12px);  /* Safari support */
+    border-bottom: 1px solid var(--border-subtle);
+    padding: 0 24px;
+  }
+
+  .nav-inner {
+    max-width: 1100px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;  /* Logo left, links right */
+    height: 52px;
+  }
+
+  /* Site brand / logo text on the left side */
+  .nav-brand {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.8rem;
+    color: var(--accent-amber);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    opacity: 0.8;
+    text-decoration: none;
+    transition: opacity 0.2s ease;
+  }
+
+  .nav-brand:hover {
+    opacity: 1;
+  }
+
+  /* Navigation links container on the right side */
+  .nav-links {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  /* Individual navigation link */
+  .nav-link {
+    font-family: 'Sora', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 400;
+    color: var(--text-secondary);
+    text-decoration: none;
+    padding: 6px 14px;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+    letter-spacing: 0.2px;
+  }
+
+  .nav-link:hover {
+    color: var(--text-primary);
+    background: rgba(160, 152, 136, 0.08);
+  }
+
+  /* Highlights the currently active page in the nav */
+  .nav-link.active {
+    color: var(--accent-amber);
+    background: rgba(240, 160, 48, 0.08);
+  }
+
+  /* Small separator dot between nav links */
+  .nav-sep {
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    opacity: 0.4;
+    margin: 0 4px;
+  }
+
+  /* ============================
+     CONTAINER
+     ============================ */
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 40px 24px;
+  }
+
+  /* ============================
+     HEADER
+     ============================ */
+  .header {
+    text-align: center;
+    margin-bottom: 48px;
+  }
+
+  .header h1 {
+    font-size: 2.2rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--accent-amber), var(--accent-warm), var(--accent-gold));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 8px;
+    letter-spacing: -0.5px;
+  }
+
+  .header .subtitle {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.85rem;
+    color: var(--accent-gold);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    opacity: 0.7;
+    margin-bottom: 14px;
+  }
+
+  .header p {
+    color: var(--text-secondary);
+    font-size: 1.05rem;
+    font-weight: 300;
+    max-width: 650px;
+    margin: 0 auto;
+    line-height: 1.7;
+  }
+
+  /* ============================
+     MAIN DIAGRAM AREA
+     The pipeline is a horizontal flow:
+     User Query → Embedding → Vector DB → Retrieved Docs → LLM → Response
+     ============================ */
+  .diagram-section {
+    background: var(--bg-panel);
+    border: 1px solid var(--border-subtle);
+    border-radius: 20px;
+    padding: 36px 20px 28px;
+    margin-bottom: 36px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Blueprint grid background effect */
+  .diagram-section::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(240, 160, 48, 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(240, 160, 48, 0.03) 1px, transparent 1px);
+    background-size: 32px 32px;
+    pointer-events: none;
+  }
+
+  /* ============================
+     SVG PIPELINE DIAGRAM
+     ============================ */
+  .pipeline-svg {
+    width: 100%;
+    height: auto;
+    display: block;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* ============================
+     PIPELINE NODE STYLES
+     Each stage of the RAG process is a rounded rectangle
+     ============================ */
+
+  /* Glow effect when a node is "active" during animation */
+  @keyframes nodeActivate {
+    0% { filter: drop-shadow(0 0 0px transparent); }
+    30% { filter: drop-shadow(0 0 15px var(--glow-amber)); }
+    100% { filter: drop-shadow(0 0 0px transparent); }
+  }
+
+  .pipeline-node {
+    cursor: pointer;
+    transition: filter 0.3s ease;
+  }
+
+  .pipeline-node:hover {
+    filter: drop-shadow(0 0 12px var(--glow-amber));
+  }
+
+  .pipeline-node.active {
+    animation: nodeActivate 0.8s ease-out forwards;
+  }
+
+  /* ============================
+     ARROW / CONNECTION ANIMATIONS
+     Arrows light up sequentially during the walkthrough
+     ============================ */
+  @keyframes arrowPulse {
+    0% { stroke: rgba(240, 160, 48, 0.15); }
+    40% { stroke: rgba(240, 160, 48, 0.8); }
+    100% { stroke: rgba(240, 160, 48, 0.15); }
+  }
+
+  .arrow-line.active {
+    animation: arrowPulse 0.6s ease-out forwards;
+    stroke-width: 2.5 !important;
+  }
+
+  /* ============================
+     DATA PARTICLE animation
+     Small dots that travel along arrows during walkthrough
+     ============================ */
+  @keyframes particleMove {
+    0% { opacity: 0; }
+    10% { opacity: 1; }
+    90% { opacity: 1; }
+    100% { opacity: 0; }
+  }
+
+  /* ============================
+     CONTROL BUTTONS
+     ============================ */
+  .controls {
+    display: flex;
+    justify-content: center;
+    gap: 14px;
+    margin-top: 22px;
+    position: relative;
+    z-index: 2;
+    flex-wrap: wrap;
+  }
+
+  .btn {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.82rem;
+    padding: 11px 24px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    letter-spacing: 0.5px;
+    border: 1px solid;
+  }
+
+  .btn-walk {
+    background: linear-gradient(135deg, rgba(240, 160, 48, 0.15), rgba(232, 133, 60, 0.15));
+    border-color: rgba(240, 160, 48, 0.35);
+    color: var(--accent-amber);
+  }
+
+  .btn-walk:hover {
+    background: linear-gradient(135deg, rgba(240, 160, 48, 0.25), rgba(232, 133, 60, 0.25));
+    border-color: var(--accent-amber);
+    box-shadow: 0 0 20px rgba(240, 160, 48, 0.15);
+  }
+
+  .btn-compare {
+    background: linear-gradient(135deg, rgba(64, 184, 160, 0.12), rgba(88, 168, 216, 0.12));
+    border-color: rgba(64, 184, 160, 0.3);
+    color: var(--accent-teal);
+  }
+
+  .btn-compare:hover {
+    background: linear-gradient(135deg, rgba(64, 184, 160, 0.22), rgba(88, 168, 216, 0.22));
+    border-color: var(--accent-teal);
+    box-shadow: 0 0 20px rgba(64, 184, 160, 0.15);
+  }
+
+  .btn:active { transform: scale(0.97); }
+
+  /* ============================
+     STATUS BAR
+     Shows which step of the walkthrough is currently active
+     ============================ */
+  .status-bar {
+    text-align: center;
+    margin-top: 16px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.82rem;
+    color: var(--accent-amber);
+    min-height: 24px;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    position: relative;
+    z-index: 2;
+  }
+
+  .status-bar.visible { opacity: 1; }
+
+  /* ============================
+     STEP DETAIL CARDS
+     Explains each stage of the RAG pipeline in depth
+     ============================ */
+  .steps-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 18px;
+    margin-top: 36px;
+  }
+
+  @media (min-width: 768px) {
+    .steps-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  .step-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: 14px;
+    padding: 24px;
+    position: relative;
+    transition: all 0.3s ease;
+    overflow: hidden;
+  }
+
+  /* Colored left accent bar per step */
+  .step-card::before {
+    content: '';
+    position: absolute;
+    top: 16px;
+    bottom: 16px;
+    left: 0;
+    width: 3px;
+    border-radius: 0 3px 3px 0;
+  }
+
+  .step-card:nth-child(1)::before { background: var(--accent-amber); }
+  .step-card:nth-child(2)::before { background: var(--accent-warm); }
+  .step-card:nth-child(3)::before { background: var(--accent-teal); }
+  .step-card:nth-child(4)::before { background: var(--accent-sky); }
+  .step-card:nth-child(5)::before { background: var(--accent-rose); }
+  .step-card:nth-child(6)::before { background: var(--accent-gold); }
+
+  .step-card:hover {
+    border-color: var(--border-amber);
+    transform: translateY(-2px);
+  }
+
+  .step-num {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .step-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+  }
+
+  .step-desc {
+    color: var(--text-secondary);
+    font-weight: 300;
+    font-size: 0.92rem;
+    line-height: 1.65;
+  }
+
+  .step-example {
+    margin-top: 12px;
+    padding: 10px 14px;
+    background: rgba(240, 160, 48, 0.06);
+    border-left: 2px solid var(--accent-gold);
+    border-radius: 0 8px 8px 0;
+    font-size: 0.82rem;
+    color: var(--accent-gold);
+    font-family: 'IBM Plex Mono', monospace;
+    line-height: 1.5;
+  }
+
+  /* ============================
+     COMPARISON PANEL
+     Shows side-by-side: LLM without RAG vs LLM with RAG
+     ============================ */
+  .compare-panel {
+    display: none;
+    margin-top: 36px;
+    border: 1px solid var(--border-subtle);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+
+  .compare-panel.visible { display: block; }
+
+  .compare-header {
+    background: rgba(64, 184, 160, 0.08);
+    padding: 16px 24px;
+    font-weight: 600;
+    font-size: 1rem;
+    border-bottom: 1px solid var(--border-subtle);
+    color: var(--accent-teal);
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  @media (max-width: 600px) {
+    .compare-grid { grid-template-columns: 1fr; }
+  }
+
+  .compare-col {
+    padding: 24px;
+  }
+
+  .compare-col:first-child {
+    border-right: 1px solid var(--border-subtle);
+  }
+
+  @media (max-width: 600px) {
+    .compare-col:first-child {
+      border-right: none;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+  }
+
+  .compare-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.72rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+
+  .compare-col:first-child .compare-label { color: var(--accent-rose); }
+  .compare-col:last-child .compare-label { color: var(--accent-teal); }
+
+  .compare-q {
+    font-weight: 600;
+    margin-bottom: 10px;
+    font-size: 0.95rem;
+  }
+
+  .compare-a {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    line-height: 1.6;
+    font-weight: 300;
+  }
+
+  .compare-tag {
+    display: inline-block;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.7rem;
+    padding: 3px 10px;
+    border-radius: 6px;
+    margin-top: 10px;
+    letter-spacing: 0.5px;
+  }
+
+  .tag-bad {
+    background: rgba(216, 96, 112, 0.15);
+    color: var(--accent-rose);
+    border: 1px solid rgba(216, 96, 112, 0.25);
+  }
+
+  .tag-good {
+    background: rgba(64, 184, 160, 0.15);
+    color: var(--accent-teal);
+    border: 1px solid rgba(64, 184, 160, 0.25);
+  }
+
+  /* ============================
+     TOOLTIP
+     ============================ */
+  .tooltip {
+    position: fixed;
+    background: #1a2235;
+    border: 1px solid var(--border-amber);
+    color: var(--text-primary);
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-size: 0.8rem;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    z-index: 100;
+    max-width: 240px;
+    font-family: 'Sora', sans-serif;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  }
+
+  .tooltip.visible { opacity: 1; }
+
+  .tooltip-title {
+    font-weight: 600;
+    color: var(--accent-amber);
+    margin-bottom: 4px;
+    font-size: 0.82rem;
+  }
+
+  /* ============================
+     FOOTER
+     ============================ */
+  .footer {
+    text-align: center;
+    margin-top: 44px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border-subtle);
+    color: var(--text-muted);
+    font-size: 0.78rem;
+  }
+</style>
+</head>
+<body>
+
+<!-- ============================
+     NAVIGATION BAR
+     Same structure as the Neural Networks page.
+     "How RAG Works" is marked active on this page.
+     To add more pages, just add more <a class="nav-link"> tags
+     and a <div class="nav-sep"></div> between them.
+     ============================ -->
+<nav class="nav-bar">
+  <div class="nav-inner">
+    <!-- Left side: site brand -->
+    <a href="/" class="nav-brand">⚡ AI Concepts</a>
+
+    <!-- Right side: page links -->
+    <div class="nav-links">
+      <a href="/" class="nav-link">Neural Networks</a>
+      <div class="nav-sep"></div>
+      <a href="/rag/how-rag-works" class="nav-link active">How RAG Works</a>
+      <div class="nav-sep"></div>
+      <a href="/transformers/how-transformers-work" class="nav-link">Transformers</a>
+      <!-- Add more links here as you build more pages:
+      <div class="nav-sep"></div>
+      <a href="/prompt-injection" class="nav-link">Prompt Injection</a>
+      -->
+    </div>
+  </div>
+</nav>
+
+<!-- Tooltip element (follows mouse on node hover) -->
+<div class="tooltip" id="tooltip">
+  <div class="tooltip-title" id="tooltip-title"></div>
+  <div id="tooltip-text"></div>
+</div>
+
+<div class="container">
+
+  <!-- ============================
+       HEADER
+       ============================ -->
+  <div class="header">
+    <div class="subtitle">Retrieval-Augmented Generation</div>
+    <h1>How RAG Works</h1>
+    <p>RAG enhances an LLM by giving it access to external knowledge — so it can answer questions with real, up-to-date facts instead of relying only on its training data.</p>
+  </div>
+
+  <!-- ============================
+       MAIN PIPELINE DIAGRAM (SVG)
+       
+       The RAG pipeline flows left to right:
+       
+       [User Query] → [Embedding Model] → [Vector Database] → [Retrieved Docs]
+                                                                       ↓
+                                                              [LLM + Context] → [Response]
+       ============================ -->
+  <div class="diagram-section">
+    <svg class="pipeline-svg" viewBox="0 0 960 420" xmlns="http://www.w3.org/2000/svg" id="rag-svg">
+
+      <!-- ============================
+           ARROW DEFINITIONS
+           Arrowhead markers for the connection lines
+           ============================ -->
+      <defs>
+        <marker id="arrow-amber" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#f0a030" opacity="0.6" />
+        </marker>
+        <marker id="arrow-amber-active" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#f0a030" />
+        </marker>
+
+        <!-- Rounded rectangle clip paths aren't needed; we'll use rx/ry -->
+
+        <!-- Glow filter for active nodes -->
+        <filter id="glow-amber" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation="6" result="blur" />
+          <feFlood flood-color="#f0a030" flood-opacity="0.3" />
+          <feComposite in2="blur" operator="in" />
+          <feMerge>
+            <feMergeNode />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+
+        <filter id="glow-teal" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation="6" result="blur" />
+          <feFlood flood-color="#40b8a0" flood-opacity="0.3" />
+          <feComposite in2="blur" operator="in" />
+          <feMerge>
+            <feMergeNode />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+      </defs>
+
+      <!-- ============================
+           CONNECTION ARROWS
+           Lines connecting each stage to the next.
+           Drawn first so they sit behind the nodes.
+           ============================ -->
+
+      <!-- Arrow 1: User Query → Embedding Model -->
+      <line class="arrow-line" id="arrow-1"
+        x1="185" y1="120" x2="255" y2="120"
+        stroke="rgba(240, 160, 48, 0.15)" stroke-width="1.5"
+        marker-end="url(#arrow-amber)" />
+
+      <!-- Arrow 2: Embedding Model → Vector Database -->
+      <line class="arrow-line" id="arrow-2"
+        x1="425" y1="120" x2="495" y2="120"
+        stroke="rgba(240, 160, 48, 0.15)" stroke-width="1.5"
+        marker-end="url(#arrow-amber)" />
+
+      <!-- Arrow 3: Vector Database → Retrieved Docs -->
+      <line class="arrow-line" id="arrow-3"
+        x1="665" y1="120" x2="735" y2="120"
+        stroke="rgba(240, 160, 48, 0.15)" stroke-width="1.5"
+        marker-end="url(#arrow-amber)" />
+
+      <!-- Arrow 4: Retrieved Docs → down to LLM row -->
+      <path class="arrow-line" id="arrow-4"
+        d="M 830 155 L 830 220 L 620 220 L 620 270"
+        fill="none"
+        stroke="rgba(240, 160, 48, 0.15)" stroke-width="1.5"
+        marker-end="url(#arrow-amber)" />
+
+      <!-- Arrow 4b: User Query also feeds into LLM (the original question) -->
+      <path class="arrow-line" id="arrow-4b"
+        d="M 100 155 L 100 220 L 520 220 L 520 270"
+        fill="none"
+        stroke="rgba(240, 160, 48, 0.15)" stroke-width="1.5"
+        marker-end="url(#arrow-amber)" />
+
+      <!-- Arrow 5: LLM → Response -->
+      <line class="arrow-line" id="arrow-5"
+        x1="700" y1="310" x2="770" y2="310"
+        stroke="rgba(240, 160, 48, 0.15)" stroke-width="1.5"
+        marker-end="url(#arrow-amber)" />
+
+      <!-- ============================
+           PIPELINE NODES
+           Each stage of the RAG process as a rounded rectangle
+           ============================ -->
+
+      <!-- NODE 1: User Query -->
+      <g class="pipeline-node" id="node-query"
+         data-tip-title="User Query"
+         data-tip-text="The user asks a question in natural language, like 'What is F5's AI Guardrails pricing?'">
+        <rect x="20" y="82" width="160" height="76" rx="12"
+          fill="rgba(240, 160, 48, 0.08)"
+          stroke="rgba(240, 160, 48, 0.35)" stroke-width="1.5" />
+        <!-- Icon: chat bubble -->
+        <text x="60" y="118" font-size="22">💬</text>
+        <text x="88" y="113" font-family="Sora" font-size="12" font-weight="600" fill="#e8e0d4">User</text>
+        <text x="88" y="130" font-family="Sora" font-size="12" font-weight="600" fill="#e8e0d4">Query</text>
+        <text x="100" y="150" font-family="IBM Plex Mono" font-size="8" fill="#6b6155" text-anchor="middle" letter-spacing="1">STEP 1</text>
+      </g>
+
+      <!-- NODE 2: Embedding Model -->
+      <g class="pipeline-node" id="node-embed"
+         data-tip-title="Embedding Model"
+         data-tip-text="Converts the text query into a numerical vector — a list of numbers that captures the meaning of the words.">
+        <rect x="260" y="82" width="160" height="76" rx="12"
+          fill="rgba(232, 133, 60, 0.08)"
+          stroke="rgba(232, 133, 60, 0.35)" stroke-width="1.5" />
+        <text x="300" y="118" font-size="22">🔢</text>
+        <text x="328" y="113" font-family="Sora" font-size="12" font-weight="600" fill="#e8e0d4">Embedding</text>
+        <text x="328" y="130" font-family="Sora" font-size="12" font-weight="600" fill="#e8e0d4">Model</text>
+        <text x="340" y="150" font-family="IBM Plex Mono" font-size="8" fill="#6b6155" text-anchor="middle" letter-spacing="1">STEP 2</text>
+      </g>
+
+      <!-- NODE 3: Vector Database -->
+      <g class="pipeline-node" id="node-vectordb"
+         data-tip-title="Vector Database"
+         data-tip-text="Stores pre-computed vectors of all your documents. Finds the most similar vectors to the query — meaning the most relevant documents.">
+        <rect x="500" y="82" width="160" height="76" rx="12"
+          fill="rgba(64, 184, 160, 0.08)"
+          stroke="rgba(64, 184, 160, 0.35)" stroke-width="1.5" />
+        <text x="540" y="118" font-size="22">🗄️</text>
+        <text x="568" y="113" font-family="Sora" font-size="12" font-weight="600" fill="#e8e0d4">Vector</text>
+        <text x="568" y="130" font-family="Sora" font-size="12" font-weight="600" fill="#e8e0d4">Database</text>
+        <text x="580" y="150" font-family="IBM Plex Mono" font-size="8" fill="#6b6155" text-anchor="middle" letter-spacing="1">STEP 3</text>
+      </g>
+
+      <!-- NODE 4: Retrieved Documents -->
+      <g class="pipeline-node" id="node-docs"
+         data-tip-title="Retrieved Documents"
+         data-tip-text="The top matching document chunks are pulled from the database — these become the 'context' the LLM will use to answer.">
+        <rect x="740" y="82" width="180" height="76" rx="12"
+          fill="rgba(88, 168, 216, 0.08)"
+          stroke="rgba(88, 168, 216, 0.35)" stroke-width="1.5" />
+        <text x="780" y="118" font-size="22">📄</text>
+        <text x="808" y="113" font-family="Sora" font-size="12" font-weight="600" fill="#e8e0d4">Retrieved</text>
+        <text x="808" y="130" font-family="Sora" font-size="12" font-weight="600" fill="#e8e0d4">Documents</text>
+        <text x="830" y="150" font-family="IBM Plex Mono" font-size="8" fill="#6b6155" text-anchor="middle" letter-spacing="1">STEP 4</text>
+      </g>
+
+      <!-- NODE 5: LLM (receives both the query AND the retrieved docs) -->
+      <g class="pipeline-node" id="node-llm"
+         data-tip-title="LLM + Context"
+         data-tip-text="The LLM receives BOTH the original question AND the retrieved documents as context. It generates an answer grounded in real data.">
+        <rect x="470" y="272" width="225" height="76" rx="12"
+          fill="rgba(212, 160, 64, 0.08)"
+          stroke="rgba(212, 160, 64, 0.35)" stroke-width="1.5" />
+        <text x="510" y="308" font-size="22">🧠</text>
+        <text x="540" y="303" font-family="Sora" font-size="12" font-weight="600" fill="#e8e0d4">LLM + Context</text>
+        <text x="540" y="320" font-family="IBM Plex Mono" font-size="9" fill="#a09888">"Answer using these docs"</text>
+        <text x="582" y="340" font-family="IBM Plex Mono" font-size="8" fill="#6b6155" text-anchor="middle" letter-spacing="1">STEP 5</text>
+      </g>
+
+      <!-- Labels on the two inputs to the LLM -->
+      <text x="290" y="213" font-family="IBM Plex Mono" font-size="8" fill="#6b6155" letter-spacing="1">ORIGINAL QUESTION</text>
+      <text x="680" y="213" font-family="IBM Plex Mono" font-size="8" fill="#6b6155" letter-spacing="1">CONTEXT DOCS</text>
+
+      <!-- NODE 6: Final Response -->
+      <g class="pipeline-node" id="node-response"
+         data-tip-title="Grounded Response"
+         data-tip-text="The final answer is based on actual retrieved documents — reducing hallucinations and providing accurate, sourced information.">
+        <rect x="775" y="272" width="160" height="76" rx="12"
+          fill="rgba(240, 160, 48, 0.1)"
+          stroke="rgba(240, 160, 48, 0.4)" stroke-width="1.5" />
+        <text x="815" y="308" font-size="22">✅</text>
+        <text x="843" y="303" font-family="Sora" font-size="12" font-weight="600" fill="#e8e0d4">Grounded</text>
+        <text x="843" y="320" font-family="Sora" font-size="12" font-weight="600" fill="#e8e0d4">Response</text>
+        <text x="855" y="340" font-family="IBM Plex Mono" font-size="8" fill="#6b6155" text-anchor="middle" letter-spacing="1">STEP 6</text>
+      </g>
+
+      <!-- ============================
+           DECORATIVE: "Knowledge Base" label near vector DB
+           Shows that the vector DB is populated from your documents
+           ============================ -->
+      <rect x="500" y="6" width="160" height="40" rx="8"
+        fill="none" stroke="rgba(64, 184, 160, 0.2)" stroke-width="1" stroke-dasharray="4 3" />
+      <text x="580" y="22" font-family="IBM Plex Mono" font-size="8" fill="#40b8a0" text-anchor="middle" letter-spacing="1">YOUR KNOWLEDGE BASE</text>
+      <text x="580" y="36" font-family="Sora" font-size="8" fill="#6b6155" text-anchor="middle">PDFs, docs, wikis, APIs...</text>
+      <!-- Small arrow from knowledge base to vector DB -->
+      <line x1="580" y1="46" x2="580" y2="78" stroke="rgba(64, 184, 160, 0.2)" stroke-width="1" stroke-dasharray="3 3" marker-end="url(#arrow-amber)" />
+
+      <!-- ============================
+           BOTTOM LABEL: What RAG solves
+           ============================ -->
+      <text x="480" y="395" font-family="IBM Plex Mono" font-size="9" fill="#6b6155" text-anchor="middle" letter-spacing="1.5">
+        RAG = RETRIEVAL (find relevant docs) + GENERATION (LLM writes the answer)
+      </text>
+
+    </svg>
+
+    <!-- ============================
+         CONTROL BUTTONS
+         ============================ -->
+    <div class="controls">
+      <button class="btn btn-walk" id="btn-walk" onclick="walkthrough()">▶ Walk Through the Pipeline</button>
+      <button class="btn btn-compare" id="btn-compare" onclick="toggleCompare()">⚖ With RAG vs Without RAG</button>
+    </div>
+
+    <!-- Status bar: shows current step description during walkthrough -->
+    <div class="status-bar" id="status-bar"></div>
+  </div>
+
+  <!-- ============================
+       COMPARISON PANEL
+       Shows the difference between an LLM with and without RAG
+       ============================ -->
+  <div class="compare-panel" id="compare-panel">
+    <div class="compare-header">⚖️ &nbsp;Same Question — Two Very Different Answers</div>
+    <div class="compare-grid">
+
+      <!-- WITHOUT RAG -->
+      <div class="compare-col">
+        <div class="compare-label">❌ Without RAG (plain LLM)</div>
+        <div class="compare-q">"What is our company's PTO policy?"</div>
+        <div class="compare-a">
+          "Most companies offer 10-15 days of PTO per year. Some companies also offer unlimited PTO. I'd recommend checking with your HR department for specific details."
+        </div>
+        <div class="compare-tag tag-bad">⚠ GENERIC — doesn't know YOUR company</div>
+      </div>
+
+      <!-- WITH RAG -->
+      <div class="compare-col">
+        <div class="compare-label">✅ With RAG (LLM + your docs)</div>
+        <div class="compare-q">"What is our company's PTO policy?"</div>
+        <div class="compare-a">
+          "Per the 2025 Employee Handbook (Section 4.2), full-time employees receive 20 days PTO annually, accruing at 1.67 days/month. Unused days roll over up to 5 days. New hires are eligible after 90 days."
+        </div>
+        <div class="compare-tag tag-good">✓ SPECIFIC — sourced from your actual documents</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================
+       STEP-BY-STEP DETAIL CARDS
+       ============================ -->
+  <div class="steps-grid">
+
+    <div class="step-card">
+      <div class="step-num">Step 01</div>
+      <div class="step-title">💬 User Asks a Question</div>
+      <div class="step-desc">
+        A user submits a natural language question. This could come from a chatbot, a search bar, an internal tool, or an API call.
+      </div>
+      <div class="step-example">
+        Example: "What are the security requirements for FedRAMP High?"
+      </div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-num">Step 02</div>
+      <div class="step-title">🔢 Convert to Embedding Vector</div>
+      <div class="step-desc">
+        An embedding model converts the text query into a <strong>vector</strong> — a long list of numbers (like [0.23, -0.87, 0.45, ...]) that represents the <em>meaning</em> of the text. Similar meanings produce similar numbers.
+      </div>
+      <div class="step-example">
+        "King" and "Queen" would have similar vectors because they're semantically related — even though the letters are different.
+      </div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-num">Step 03</div>
+      <div class="step-title">🗄️ Search the Vector Database</div>
+      <div class="step-desc">
+        Your knowledge base (PDFs, wikis, docs) has already been pre-processed into vectors and stored. The system now finds the vectors most <strong>similar</strong> to the query vector — essentially finding the most relevant document chunks.
+      </div>
+      <div class="step-example">
+        Think of it like a librarian who instantly knows which pages in which books are most relevant to your question.
+      </div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-num">Step 04</div>
+      <div class="step-title">📄 Retrieve Top Matching Docs</div>
+      <div class="step-desc">
+        The top N matching document chunks are pulled out. These become the <strong>"context"</strong> that will be fed to the LLM. This is the "Retrieval" part of RAG.
+      </div>
+      <div class="step-example">
+        Typically 3-10 chunks are retrieved, each a few hundred tokens. Too few = missing info. Too many = noise and confusion.
+      </div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-num">Step 05</div>
+      <div class="step-title">🧠 LLM Generates an Answer</div>
+      <div class="step-desc">
+        The LLM receives a prompt containing both the <strong>original question</strong> and the <strong>retrieved documents</strong>. It's essentially told: "Answer this question, but ONLY using the information provided." This is the "Generation" part.
+      </div>
+      <div class="step-example">
+        Prompt: "Based on the following context: [retrieved docs]... Answer the user's question: [original query]"
+      </div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-num">Step 06</div>
+      <div class="step-title">✅ Grounded, Accurate Response</div>
+      <div class="step-desc">
+        The response is <strong>grounded</strong> in real data — meaning it's based on actual documents rather than the LLM's training data alone. This dramatically reduces <strong>hallucinations</strong> (made-up facts) and keeps answers accurate and sourced.
+      </div>
+      <div class="step-example">
+        Key benefit: You can update your knowledge base anytime without retraining the entire LLM — just re-index the new docs!
+      </div>
+    </div>
+
+  </div>
+
+  <div class="footer">
+    Interactive RAG Pipeline Diagram — Hover over stages for details, walk through the pipeline, or compare RAG vs non-RAG
+  </div>
+</div>
+
+<script>
+  // ============================
+  // TOOLTIP FUNCTIONALITY
+  // Shows info when hovering over pipeline nodes
+  // ============================
+  const tooltipEl = document.getElementById('tooltip');
+  const tooltipTitle = document.getElementById('tooltip-title');
+  const tooltipText = document.getElementById('tooltip-text');
+
+  // Attach hover listeners to all pipeline nodes
+  document.querySelectorAll('.pipeline-node').forEach(node => {
+    node.addEventListener('mouseenter', (e) => {
+      tooltipTitle.textContent = node.getAttribute('data-tip-title');
+      tooltipText.textContent = node.getAttribute('data-tip-text');
+      tooltipEl.classList.add('visible');
+    });
+    node.addEventListener('mousemove', (e) => {
+      tooltipEl.style.left = (e.clientX + 16) + 'px';
+      tooltipEl.style.top = (e.clientY - 10) + 'px';
+    });
+    node.addEventListener('mouseleave', () => {
+      tooltipEl.classList.remove('visible');
+    });
+  });
+
+  // ============================
+  // WALKTHROUGH ANIMATION
+  // Steps through the pipeline one stage at a time,
+  // lighting up each node and arrow sequentially
+  // ============================
+  let isWalking = false;  // prevent double-clicking
+
+  // Define each step of the animation:
+  //   nodeId: which pipeline node to highlight
+  //   arrowIds: which arrow lines to light up
+  //   status: text to display in the status bar
+  const walkthroughSteps = [
+    {
+      nodeId: 'node-query',
+      arrowIds: ['arrow-1'],
+      status: '💬 Step 1: User submits a question...'
+    },
+    {
+      nodeId: 'node-embed',
+      arrowIds: ['arrow-2'],
+      status: '🔢 Step 2: Query is converted to a numerical vector...'
+    },
+    {
+      nodeId: 'node-vectordb',
+      arrowIds: ['arrow-3'],
+      status: '🗄️ Step 3: Vector DB finds the most relevant documents...'
+    },
+    {
+      nodeId: 'node-docs',
+      arrowIds: ['arrow-4', 'arrow-4b'],
+      status: '📄 Step 4: Top matching docs + original query are sent to the LLM...'
+    },
+    {
+      nodeId: 'node-llm',
+      arrowIds: ['arrow-5'],
+      status: '🧠 Step 5: LLM generates an answer using the retrieved context...'
+    },
+    {
+      nodeId: 'node-response',
+      arrowIds: [],
+      status: '✅ Step 6: User receives an accurate, grounded response!'
+    }
+  ];
+
+  function walkthrough() {
+    if (isWalking) return;
+    isWalking = true;
+
+    const btn = document.getElementById('btn-walk');
+    const statusBar = document.getElementById('status-bar');
+    btn.textContent = '▶ Walking through...';
+    btn.style.opacity = '0.6';
+    statusBar.classList.add('visible');
+
+    // Animate each step with a delay between them
+    walkthroughSteps.forEach((step, idx) => {
+      const delay = idx * 1000;  // 1 second per step
+
+      setTimeout(() => {
+        // Update the status bar text
+        statusBar.textContent = step.status;
+
+        // Highlight the current node
+        const node = document.getElementById(step.nodeId);
+        node.classList.add('active');
+        // Remove highlight after it fades
+        setTimeout(() => node.classList.remove('active'), 800);
+
+        // Light up the arrows FROM this step
+        step.arrowIds.forEach(arrowId => {
+          const arrow = document.getElementById(arrowId);
+          arrow.classList.add('active');
+          setTimeout(() => arrow.classList.remove('active'), 700);
+        });
+      }, delay);
+    });
+
+    // Reset everything after the full walkthrough
+    const totalTime = walkthroughSteps.length * 1000 + 800;
+    setTimeout(() => {
+      btn.textContent = '▶ Walk Through the Pipeline';
+      btn.style.opacity = '1';
+      statusBar.textContent = '🎉 Complete! Click again to replay.';
+      setTimeout(() => statusBar.classList.remove('visible'), 2500);
+      isWalking = false;
+    }, totalTime);
+  }
+
+  // ============================
+  // TOGGLE COMPARISON PANEL
+  // Shows/hides the "With RAG vs Without RAG" comparison
+  // ============================
+  function toggleCompare() {
+    const panel = document.getElementById('compare-panel');
+    const btn = document.getElementById('btn-compare');
+
+    if (panel.classList.contains('visible')) {
+      // Hide the panel
+      panel.classList.remove('visible');
+      btn.textContent = '⚖ With RAG vs Without RAG';
+    } else {
+      // Show the panel and scroll to it
+      panel.classList.add('visible');
+      btn.textContent = '⚖ Hide Comparison';
+      // Smooth scroll to the comparison panel
+      setTimeout(() => {
+        panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 100);
+    }
+  }
+</script>
+
+</body>
+</html>
