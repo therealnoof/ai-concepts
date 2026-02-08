@@ -614,13 +614,13 @@
     <div class="nav-links">
       <a href="/" class="nav-link">Neural Networks</a>
       <div class="nav-sep"></div>
-      <a href="/rag/how-rag-works" class="nav-link active">RAG Pipeline</a>
+      <a href="/rag/how-rag-works" class="nav-link active">RAG</a>
       <div class="nav-sep"></div>
       <a href="/transformers/how-transformers-work" class="nav-link">Transformers</a>
       <div class="nav-sep"></div>
       <a href="/agentic-ai/how-agents-work" class="nav-link">Agentic AI</a>
       <div class="nav-sep"></div>
-      <a href="/training/how-training-works" class="nav-link">Training Pipeline</a>
+      <a href="/training/how-training-works" class="nav-link">Training</a>
       <div class="nav-sep"></div>
       <a href="/ai-security/securing-ai" class="nav-link">AI Security</a>
       <!-- Add more links here as you build more pages:
@@ -762,7 +762,7 @@
       <!-- NODE 2: Embedding Model -->
       <g class="pipeline-node" id="node-embed"
          data-tip-title="Embedding Model"
-         data-tip-text="Converts the text query into a numerical vector — a list of numbers that captures the meaning of the words.">
+         data-tip-text="Converts text into a numerical vector — a list of 768 to 3,072 numbers (called 'dimensions') that captures meaning. Each dimension represents a different aspect of meaning. More dimensions = more nuance. Example models: text-embedding-3-large (3,072 dims), text-embedding-ada-002 (1,536 dims).">
         <rect x="260" y="82" width="160" height="76" rx="12"
           fill="rgba(232, 133, 60, 0.08)"
           stroke="rgba(232, 133, 60, 0.35)" stroke-width="1.5" />
@@ -775,7 +775,7 @@
       <!-- NODE 3: Vector Database -->
       <g class="pipeline-node" id="node-vectordb"
          data-tip-title="Vector Database"
-         data-tip-text="Stores pre-computed vectors of all your documents. Finds the most similar vectors to the query — meaning the most relevant documents.">
+         data-tip-text="Stores pre-computed embedding vectors of all your documents. When a query comes in, it performs similarity search (cosine similarity or dot product) across all stored vectors to find the closest matches. Databases like Pinecone, Weaviate, pgvector, and FAISS are optimized for searching millions of high-dimensional vectors in milliseconds.">
         <rect x="500" y="82" width="160" height="76" rx="12"
           fill="rgba(64, 184, 160, 0.08)"
           stroke="rgba(64, 184, 160, 0.35)" stroke-width="1.5" />
@@ -910,10 +910,12 @@
       <div class="step-num">Step 02</div>
       <div class="step-title">🔢 Convert to Embedding Vector</div>
       <div class="step-desc">
-        An embedding model converts the text query into a <strong>vector</strong> — a long list of numbers (like [0.23, -0.87, 0.45, ...]) that represents the <em>meaning</em> of the text. Similar meanings produce similar numbers.
+        An embedding model converts the text query into a <strong>vector</strong> — a list of numbers that represents the <em>meaning</em> of the text. The length of this list is called the number of <strong>dimensions</strong>. Each dimension captures a different aspect of meaning (topic, tone, specificity, etc.). More dimensions = more nuance.
+        <br><br>
+        Think of it like describing a location. Two dimensions (latitude, longitude) gets you to the right city. But 1,536 dimensions? That's like specifying the exact building, floor, room, desk, and which drawer is open. The more dimensions, the more precisely you can pinpoint meaning.
       </div>
       <div class="step-example">
-        "King" and "Queen" would have similar vectors because they're semantically related — even though the letters are different.
+        "King" → [0.23, -0.87, 0.45, ...] (1,536 numbers). "Queen" gets a very similar list because they're semantically related. Common models: text-embedding-3-large (3,072 dims), text-embedding-ada-002 (1,536 dims), all-MiniLM (384 dims).
       </div>
     </div>
 
@@ -921,10 +923,10 @@
       <div class="step-num">Step 03</div>
       <div class="step-title">🗄️ Search the Vector Database</div>
       <div class="step-desc">
-        Your knowledge base (PDFs, wikis, docs) has already been pre-processed into vectors and stored. The system now finds the vectors most <strong>similar</strong> to the query vector — essentially finding the most relevant document chunks.
+        Before any user query arrives, your knowledge base (PDFs, wikis, docs) has already been through an <strong>indexing pipeline</strong>: documents are split into chunks → each chunk is run through the <strong>same embedding model</strong> → the resulting vectors are stored in a vector database. When a query comes in, the system finds stored vectors most <strong>similar</strong> to the query vector using cosine similarity — essentially measuring the angle between vectors in high-dimensional space.
       </div>
       <div class="step-example">
-        Think of it like a librarian who instantly knows which pages in which books are most relevant to your question.
+        Indexing pipeline: Chunk docs (500 tokens each) → embed each chunk → store in Pinecone, Weaviate, pgvector, or FAISS. The query and docs MUST use the same embedding model and dimensions.
       </div>
     </div>
 

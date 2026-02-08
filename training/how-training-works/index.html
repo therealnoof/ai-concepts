@@ -231,6 +231,7 @@
   .step-card:nth-child(8)::before { background: var(--accent-lime); }
   .step-card:nth-child(9)::before { background: var(--accent-electric); }
   .step-card:nth-child(10)::before { background: var(--accent-indigo); }
+  .step-card:nth-child(11)::before { background: var(--accent-cyan); }
 
   .step-card:hover { border-color: var(--border-indigo); transform: translateY(-2px); }
 
@@ -340,15 +341,13 @@
     <div class="nav-links">
       <a href="/" class="nav-link">Neural Networks</a>
       <div class="nav-sep"></div>
-      <a href="/rag/how-rag-works" class="nav-link">RAG Pipeline</a>
+      <a href="/rag/how-rag-works" class="nav-link">RAG</a>
       <div class="nav-sep"></div>
       <a href="/transformers/how-transformers-work" class="nav-link">Transformers</a>
       <div class="nav-sep"></div>
       <a href="/agentic-ai/how-agents-work" class="nav-link">Agentic AI</a>
       <div class="nav-sep"></div>
       <a href="/training/how-training-works" class="nav-link active">Training Pipeline</a>
-      <div class="nav-sep"></div>
-      <a href="/ai-security/securing-ai" class="nav-link">AI Security</a>
       <!-- Add more links here:
       <div class="nav-sep"></div>
       <a href="/prompt-injection" class="nav-link">Prompt Injection</a>
@@ -384,7 +383,7 @@
        DATA PREPARATION | FOUNDATION TRAINING | ALIGNMENT | DEPLOYMENT
        ============================ -->
   <div class="diagram-section">
-    <svg class="diagram-svg" viewBox="0 0 960 440" xmlns="http://www.w3.org/2000/svg">
+    <svg class="diagram-svg" viewBox="0 0 1060 440" xmlns="http://www.w3.org/2000/svg">
 
       <defs>
         <marker id="arr-i" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
@@ -396,15 +395,15 @@
            PHASE GROUPING BRACKETS (top)
            ============================ -->
 
-      <!-- Phase 1: Data Preparation -->
-      <rect x="22" y="18" width="465" height="28" rx="6"
+      <!-- Phase 1: Data Preparation (includes embedding now) -->
+      <rect x="22" y="18" width="610" height="28" rx="6"
         fill="rgba(99, 102, 241, 0.05)" stroke="rgba(99, 102, 241, 0.15)" stroke-width="1" />
-      <text class="phase-label" x="254" y="36" fill="#6366f1">PHASE 1 — DATA PREPARATION</text>
+      <text class="phase-label" x="327" y="36" fill="#6366f1">PHASE 1 — DATA PREPARATION &amp; EMBEDDING</text>
 
       <!-- Phase 2: Foundation Training -->
-      <rect x="500" y="18" width="200" height="28" rx="6"
+      <rect x="646" y="18" width="200" height="28" rx="6"
         fill="rgba(245, 158, 11, 0.05)" stroke="rgba(245, 158, 11, 0.15)" stroke-width="1" />
-      <text class="phase-label" x="600" y="36" fill="#f59e0b">PHASE 2 — FOUNDATION</text>
+      <text class="phase-label" x="746" y="36" fill="#f59e0b">PHASE 2 — FOUNDATION</text>
 
       <!-- Phase 3: Alignment -->
       <rect x="22" y="205" width="462" height="28" rx="6"
@@ -412,19 +411,22 @@
       <text class="phase-label" x="253" y="223" fill="#2dd4bf">PHASE 3 — ALIGNMENT</text>
 
       <!-- Phase 4: Deployment -->
-      <rect x="500" y="205" width="435" height="28" rx="6"
+      <rect x="500" y="205" width="535" height="28" rx="6"
         fill="rgba(132, 204, 22, 0.05)" stroke="rgba(132, 204, 22, 0.15)" stroke-width="1" />
-      <text class="phase-label" x="717" y="223" fill="#84cc16">PHASE 4 — EVALUATION &amp; DEPLOYMENT</text>
+      <text class="phase-label" x="767" y="223" fill="#84cc16">PHASE 4 — EVALUATION &amp; DEPLOYMENT</text>
 
       <!-- ============================
            ROW 1 ARROWS
            ============================ -->
       <line class="flow-arrow" id="fa-1" x1="177" y1="95" x2="195" y2="95" stroke="#6366f1" stroke-opacity="0.1" stroke-width="1.5" marker-end="url(#arr-i)" />
       <line class="flow-arrow" id="fa-2" x1="355" y1="95" x2="373" y2="95" stroke="#6366f1" stroke-opacity="0.1" stroke-width="1.5" marker-end="url(#arr-i)" />
+      <!-- Tokenization → Embedding -->
       <line class="flow-arrow" id="fa-3" x1="530" y1="95" x2="548" y2="95" stroke="#6366f1" stroke-opacity="0.1" stroke-width="1.5" marker-end="url(#arr-i)" />
+      <!-- Embedding → Pre-Training -->
+      <line class="flow-arrow" id="fa-3b" x1="680" y1="95" x2="698" y2="95" stroke="#6366f1" stroke-opacity="0.1" stroke-width="1.5" marker-end="url(#arr-i)" />
 
       <!-- Row connector: Pre-Training → down → SFT -->
-      <path class="flow-arrow" id="fa-4" d="M 700 130 L 700 175 L 140 175 L 140 245"
+      <path class="flow-arrow" id="fa-4" d="M 850 130 L 850 175 L 140 175 L 140 245"
         fill="none" stroke="#6366f1" stroke-opacity="0.1" stroke-width="1.5" marker-end="url(#arr-i)" />
 
       <!-- ROW 2 ARROWS -->
@@ -472,29 +474,41 @@
         <text x="453" y="124" font-family="Geist Mono" font-size="7" fill="#585c78" text-anchor="middle" letter-spacing="1">STEP 3</text>
       </g>
 
-      <!-- NODE 4: Pre-Training -->
-      <g class="pipe-node" id="node-pretrain"
-         data-tip-title="4. Pre-Training (Next Token Prediction)"
-         data-tip-text="The BIG step. The model learns to predict the next token, billions of times. Trained on thousands of GPUs for weeks/months. This is where it learns language, facts, reasoning — costing $10M-$100M+ in compute.">
-        <rect x="553" y="54" width="145" height="82" rx="11"
-          fill="rgba(245, 158, 11, 0.08)" stroke="rgba(245, 158, 11, 0.35)" stroke-width="2" />
-        <text x="583" y="88" font-size="18">⚡</text>
-        <text x="607" y="86" font-family="Bricolage Grotesque" font-size="12" font-weight="700" fill="#dde0f0">Pre-Training</text>
-        <text x="607" y="102" font-family="Geist Mono" font-size="8" fill="#8e92b0">next token</text>
-        <text x="607" y="114" font-family="Geist Mono" font-size="8" fill="#8e92b0">prediction</text>
-        <text x="626" y="130" font-family="Geist Mono" font-size="7" fill="#585c78" text-anchor="middle" letter-spacing="1">STEP 4</text>
+      <!-- NODE 3b: Embedding (NEW) -->
+      <g class="pipe-node" id="node-embed"
+         data-tip-title="3b. Embedding Layer"
+         data-tip-text="Token IDs are converted into dense vectors — lists of 768 to 12,288 numbers called 'dimensions'. Each dimension captures a different aspect of meaning. Think of 2 dimensions (lat/long) finding a city vs 12,288 dimensions capturing every nuance of a word. Positional embeddings encode WHERE each token sits. These weights are learned during pre-training. Separate from RAG embeddings, which use dedicated models like text-embedding-3-large.">
+        <rect x="553" y="58" width="125" height="74" rx="11"
+          fill="rgba(167, 139, 250, 0.08)" stroke="rgba(167, 139, 250, 0.3)" stroke-width="1.5" />
+        <text x="578" y="88" font-size="18">📐</text>
+        <text x="600" y="88" font-family="Bricolage Grotesque" font-size="12" font-weight="600" fill="#dde0f0">Embedding</text>
+        <text x="600" y="104" font-family="Geist Mono" font-size="8" fill="#8e92b0">IDs → vectors</text>
+        <text x="615" y="124" font-family="Geist Mono" font-size="7" fill="#585c78" text-anchor="middle" letter-spacing="1">STEP 3b</text>
       </g>
 
-      <!-- Pre-training stats callout -->
+      <!-- NODE 4: Pre-Training (shifted right to make room for embedding) -->
+      <g class="pipe-node" id="node-pretrain"
+         data-tip-title="4. Pre-Training (Next Token Prediction)"
+         data-tip-text="The BIG step. The model learns to predict the next token, billions of times. Trained on thousands of GPUs for weeks/months. This is where it learns language, facts, reasoning — costing $10M-$100M+ in compute. The embedding layer feeds vectors into the transformer layers here.">
+        <rect x="703" y="54" width="145" height="82" rx="11"
+          fill="rgba(245, 158, 11, 0.08)" stroke="rgba(245, 158, 11, 0.35)" stroke-width="2" />
+        <text x="733" y="88" font-size="18">⚡</text>
+        <text x="757" y="86" font-family="Bricolage Grotesque" font-size="12" font-weight="700" fill="#dde0f0">Pre-Training</text>
+        <text x="757" y="102" font-family="Geist Mono" font-size="8" fill="#8e92b0">next token</text>
+        <text x="757" y="114" font-family="Geist Mono" font-size="8" fill="#8e92b0">prediction</text>
+        <text x="776" y="130" font-family="Geist Mono" font-size="7" fill="#585c78" text-anchor="middle" letter-spacing="1">STEP 4</text>
+      </g>
+
+      <!-- Pre-training stats callout (shifted right) -->
       <g opacity="0.5">
-        <rect x="720" y="56" width="218" height="80" rx="8"
+        <rect x="866" y="56" width="180" height="80" rx="8"
           fill="none" stroke="rgba(245, 158, 11, 0.15)" stroke-width="1" stroke-dasharray="4 3" />
-        <text x="829" y="74" font-family="Geist Mono" font-size="8" fill="#f59e0b" text-anchor="middle" letter-spacing="1">PRE-TRAINING SCALE</text>
-        <text x="740" y="92" font-family="Geist Mono" font-size="8" fill="#585c78">📊 Trillions of tokens</text>
-        <text x="740" y="106" font-family="Geist Mono" font-size="8" fill="#585c78">🖥️ 1,000s-10,000s of GPUs</text>
-        <text x="740" y="120" font-family="Geist Mono" font-size="8" fill="#585c78">⏱️ Weeks to months</text>
-        <text x="740" y="134" font-family="Geist Mono" font-size="8" fill="#585c78">💰 $10M–$100M+ compute</text>
-        <line x1="720" y1="95" x2="700" y2="95" stroke="rgba(245, 158, 11, 0.15)" stroke-width="1" stroke-dasharray="4 3" />
+        <text x="956" y="74" font-family="Geist Mono" font-size="8" fill="#f59e0b" text-anchor="middle" letter-spacing="1">PRE-TRAINING SCALE</text>
+        <text x="878" y="92" font-family="Geist Mono" font-size="8" fill="#585c78">📊 Trillions of tokens</text>
+        <text x="878" y="106" font-family="Geist Mono" font-size="8" fill="#585c78">🖥️ 1,000s-10,000s GPUs</text>
+        <text x="878" y="120" font-family="Geist Mono" font-size="8" fill="#585c78">⏱️ Weeks to months</text>
+        <text x="878" y="134" font-family="Geist Mono" font-size="8" fill="#585c78">💰 $10M–$100M+ compute</text>
+        <line x1="866" y1="95" x2="850" y2="95" stroke="rgba(245, 158, 11, 0.15)" stroke-width="1" stroke-dasharray="4 3" />
       </g>
 
       <!-- Transition label -->
@@ -557,8 +571,8 @@
       <!-- NODE 8: Deployed Model -->
       <g class="pipe-node" id="node-deploy"
          data-tip-title="8. Deployed Model"
-         data-tip-text="The final model is optimized for inference (quantization, distillation), deployed to servers, and made available via API or product. Continuous monitoring and updates follow.">
-        <rect x="703" y="245" width="230" height="80" rx="11"
+         data-tip-text="The final model is optimized for inference (quantization, distillation), deployed to servers, and made available via API or product. At deployment, a separate embedding model may be used to embed documents for RAG retrieval. Continuous monitoring and updates follow.">
+        <rect x="703" y="245" width="330" height="80" rx="11"
           fill="rgba(99, 102, 241, 0.1)" stroke="rgba(99, 102, 241, 0.4)" stroke-width="1.5" />
         <text x="738" y="280" font-size="18">🚀</text>
         <text x="763" y="278" font-family="Bricolage Grotesque" font-size="13" font-weight="700" fill="#dde0f0">Deployed Model</text>
@@ -663,6 +677,17 @@
         Clean text is split into <strong>tokens</strong> using algorithms like BPE (Byte Pair Encoding) or SentencePiece. A vocabulary is built (typically 32K-100K tokens). Common words stay whole; rare words get broken into pieces. Every token gets a numerical ID the model can process.
       </div>
       <div class="step-example">"unhappiness" → ["un", "happi", "ness"] → [348, 12902, 655]. The tokenizer is trained once and frozen.</div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-num">Step 3b</div>
+      <div class="step-title">📐 Embedding Layer</div>
+      <div class="step-desc">
+        Token IDs are just integers — the model needs richer representations. The <strong>embedding layer</strong> converts each token ID into a <strong>dense vector</strong> (typically 768 to 12,288 dimensions). But what are dimensions? Each <strong>dimension</strong> captures a different aspect of meaning — topic, tone, formality, part of speech, and thousands of abstract features the model learns on its own.
+        <br><br>
+        Think of 2D coordinates (latitude, longitude) — enough to find a city. Now imagine <strong>12,288 coordinates</strong> — enough to capture every nuance of a word's meaning. Semantically similar tokens ("king" / "queen") end up with nearby vectors. <strong>Positional embeddings</strong> are added so the model knows where each token sits in the sequence. These weights are <strong>learned during pre-training</strong>.
+      </div>
+      <div class="step-example">Token ID 348 → [0.23, -0.87, 0.41, ...] (768-12,288 dims depending on model size). Separately, RAG systems use dedicated embedding models (text-embedding-3-large, 3,072 dims) to convert documents into vectors for retrieval.</div>
     </div>
 
     <div class="step-card">
@@ -772,11 +797,12 @@
     { nodeId: 'node-collect',  arrowIds: ['fa-1'],  status: '🌐 Step 1: Collecting trillions of tokens from the internet — web, books, code, papers...' },
     { nodeId: 'node-clean',    arrowIds: ['fa-2'],  status: '🧹 Step 2: Filtering out junk — dedup, PII removal, toxicity filtering, quality scoring...' },
     { nodeId: 'node-tokenize', arrowIds: ['fa-3'],  status: '✂️ Step 3: Splitting text into tokens and converting to numerical IDs...' },
+    { nodeId: 'node-embed',    arrowIds: ['fa-3b'], status: '📐 Step 3b: Token IDs → dense vectors (embeddings). 768-12K dimensions capturing meaning + position...' },
     { nodeId: 'node-pretrain', arrowIds: ['fa-4'],  status: '⚡ Step 4: Pre-training — next token prediction on thousands of GPUs for months...' },
     { nodeId: 'node-sft',      arrowIds: ['fa-5'],  status: '👩‍🏫 Step 5: Supervised fine-tuning — learning from human-written ideal responses...' },
     { nodeId: 'node-rlhf',     arrowIds: ['fa-6'],  status: '🏆 Step 6: RLHF — human raters rank outputs, model optimizes for their preferences...' },
     { nodeId: 'node-eval',     arrowIds: ['fa-7'],  status: '🧪 Step 7: Evaluation — benchmarks, red-teaming, bias testing, safety checks...' },
-    { nodeId: 'node-deploy',   arrowIds: [],         status: '🚀 Step 8: Deployed! Quantized, optimized, and served to millions of users.' },
+    { nodeId: 'node-deploy',   arrowIds: [],         status: '🚀 Step 8: Deployed! Quantized, optimized, and served. RAG uses separate embedding models for retrieval.' },
   ];
 
   function walkthrough() {
