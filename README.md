@@ -9,6 +9,7 @@ Interactive, animated diagrams that explain AI and machine learning concepts vis
 - **[Transformers](/transformers/how-transformers-work)** — The architecture powering modern LLMs
 - **[Agentic AI](/agentic-ai/how-agents-work)** — How AI agents reason, plan, use tools, and collaborate
 - **[Training Pipeline](/training/how-training-works)** — How LLMs are trained from raw data to deployed model
+- **[AI Security](/ai-security/securing-ai)** — End-to-end security for the AI data factory
 
 ## Tech Stack
 
