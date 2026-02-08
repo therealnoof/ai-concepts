@@ -5,7 +5,7 @@ Interactive, animated diagrams that explain AI and machine learning concepts vis
 ## Pages
 
 - **[Neural Networks](/)** — How artificial neural networks process data through layers of neurons
-- **[How RAG Works](/rag/how-rag-works)** — Retrieval-Augmented Generation pipeline diagram
+- **[RAG Pipeline](/rag/how-rag-works)** — Retrieval-Augmented Generation pipeline diagram
 - **[Transformers](/transformers/how-transformers-work)** — The architecture powering modern LLMs
 - **[Agentic AI](/agentic-ai/how-agents-work)** — How AI agents reason, plan, use tools, and collaborate
 - **[Training Pipeline](/training/how-training-works)** — How LLMs are trained from raw data to deployed model
