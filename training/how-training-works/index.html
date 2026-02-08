@@ -1,0 +1,947 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>How LLM Training Works — From Raw Data to Deployed Model</title>
+
+<!-- Font pairing: Bricolage Grotesque for display, Geist Mono for technical -->
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@300;400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+  /* ============================
+     CSS VARIABLES
+     Deep indigo / electric blue on near-black.
+     Evokes "data processing" — deep, structured, layered.
+     ============================ */
+  :root {
+    --bg-deep: #08080f;
+    --bg-panel: #0e0f1a;
+    --bg-card: #141625;
+    --text-primary: #dde0f0;
+    --text-secondary: #8e92b0;
+    --text-muted: #585c78;
+    --accent-indigo: #6366f1;
+    --accent-blue: #818cf8;
+    --accent-electric: #a5b4fc;
+    --accent-cyan: #38bdf8;
+    --accent-teal: #2dd4bf;
+    --accent-amber: #f59e0b;
+    --accent-rose: #f43f5e;
+    --accent-lime: #84cc16;
+    --accent-violet: #c084fc;
+    --glow-indigo: rgba(99, 102, 241, 0.25);
+    --glow-blue: rgba(129, 140, 248, 0.2);
+    --border-subtle: rgba(142, 146, 176, 0.1);
+    --border-indigo: rgba(99, 102, 241, 0.2);
+  }
+
+  /* ============================
+     RESET & BASE
+     ============================ */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg-deep);
+    color: var(--text-primary);
+    font-family: 'Bricolage Grotesque', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ============================
+     NAVIGATION BAR
+     ============================ */
+  .nav-bar {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: rgba(8, 8, 15, 0.88);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border-subtle);
+    padding: 0 24px;
+  }
+  .nav-inner {
+    max-width: 1100px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 52px;
+  }
+  .nav-brand {
+    font-family: 'Geist Mono', monospace;
+    font-size: 0.8rem;
+    color: var(--accent-indigo);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    opacity: 0.8;
+    text-decoration: none;
+    transition: opacity 0.2s ease;
+  }
+  .nav-brand:hover { opacity: 1; }
+  .nav-links { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+  .nav-link {
+    font-family: 'Bricolage Grotesque', sans-serif;
+    font-size: 0.85rem; font-weight: 400;
+    color: var(--text-secondary);
+    text-decoration: none; padding: 6px 14px;
+    border-radius: 8px; transition: all 0.2s ease;
+  }
+  .nav-link:hover { color: var(--text-primary); background: rgba(142, 146, 176, 0.08); }
+  .nav-link.active { color: var(--accent-indigo); background: rgba(99, 102, 241, 0.08); }
+  .nav-sep { width: 3px; height: 3px; border-radius: 50%; background: var(--text-muted); opacity: 0.4; margin: 0 4px; }
+
+  /* ============================
+     CONTAINER & HEADER
+     ============================ */
+  .container { max-width: 1100px; margin: 0 auto; padding: 40px 24px; }
+
+  .header { text-align: center; margin-bottom: 48px; }
+  .header h1 {
+    font-size: 2.2rem; font-weight: 800;
+    background: linear-gradient(135deg, var(--accent-indigo), var(--accent-blue), var(--accent-electric));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    margin-bottom: 8px; letter-spacing: -0.5px;
+  }
+  .header .subtitle {
+    font-family: 'Geist Mono', monospace;
+    font-size: 0.82rem; color: var(--accent-blue);
+    letter-spacing: 3px; text-transform: uppercase;
+    opacity: 0.7; margin-bottom: 14px;
+  }
+  .header p {
+    color: var(--text-secondary); font-size: 1.05rem; font-weight: 300;
+    max-width: 720px; margin: 0 auto; line-height: 1.7;
+  }
+
+  /* ============================
+     DIAGRAM SECTION
+     ============================ */
+  .diagram-section {
+    background: var(--bg-panel);
+    border: 1px solid var(--border-subtle);
+    border-radius: 20px;
+    padding: 36px 12px 28px;
+    margin-bottom: 36px;
+    position: relative; overflow: hidden;
+  }
+  .diagram-section::before {
+    content: '';
+    position: absolute; inset: 0;
+    background-image: radial-gradient(circle at 1px 1px, rgba(99, 102, 241, 0.03) 1px, transparent 0);
+    background-size: 26px 26px; pointer-events: none;
+  }
+  .diagram-svg { width: 100%; height: auto; display: block; position: relative; z-index: 1; }
+
+  /* ============================
+     NODE & ARROW ANIMATIONS
+     ============================ */
+  @keyframes nodeGlow {
+    0% { filter: drop-shadow(0 0 0px transparent); }
+    35% { filter: drop-shadow(0 0 16px var(--glow-indigo)); }
+    100% { filter: drop-shadow(0 0 0px transparent); }
+  }
+  .pipe-node { cursor: pointer; transition: filter 0.3s ease; }
+  .pipe-node:hover { filter: drop-shadow(0 0 12px var(--glow-indigo)); }
+  .pipe-node.active { animation: nodeGlow 0.9s ease-out forwards; }
+
+  @keyframes arrowPulse {
+    0% { stroke-opacity: 0.1; }
+    40% { stroke-opacity: 0.85; }
+    100% { stroke-opacity: 0.1; }
+  }
+  .flow-arrow.active { animation: arrowPulse 0.6s ease-out forwards; stroke-width: 2.5 !important; }
+
+  /* ============================
+     PHASE LABELS (above diagram)
+     ============================ */
+  .phase-label {
+    font-family: 'Geist Mono', monospace;
+    font-size: 8px; letter-spacing: 2px;
+    text-transform: uppercase; text-anchor: middle;
+  }
+
+  /* ============================
+     CONTROLS & STATUS
+     ============================ */
+  .controls { display: flex; justify-content: center; gap: 14px; margin-top: 22px; position: relative; z-index: 2; flex-wrap: wrap; }
+  .btn {
+    font-family: 'Geist Mono', monospace; font-size: 0.82rem;
+    padding: 11px 24px; border-radius: 10px; cursor: pointer;
+    transition: all 0.3s ease; letter-spacing: 0.5px; border: 1px solid;
+  }
+  .btn-walk {
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(129, 140, 248, 0.15));
+    border-color: rgba(99, 102, 241, 0.35); color: var(--accent-indigo);
+  }
+  .btn-walk:hover {
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.25), rgba(129, 140, 248, 0.25));
+    border-color: var(--accent-indigo); box-shadow: 0 0 20px rgba(99, 102, 241, 0.15);
+  }
+  .btn-loss {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.12), rgba(244, 63, 94, 0.12));
+    border-color: rgba(245, 158, 11, 0.3); color: var(--accent-amber);
+  }
+  .btn-loss:hover {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.22), rgba(244, 63, 94, 0.22));
+    border-color: var(--accent-amber); box-shadow: 0 0 20px rgba(245, 158, 11, 0.15);
+  }
+  .btn-compare {
+    background: linear-gradient(135deg, rgba(45, 212, 191, 0.12), rgba(56, 189, 248, 0.12));
+    border-color: rgba(45, 212, 191, 0.3); color: var(--accent-teal);
+  }
+  .btn-compare:hover {
+    background: linear-gradient(135deg, rgba(45, 212, 191, 0.22), rgba(56, 189, 248, 0.22));
+    border-color: var(--accent-teal); box-shadow: 0 0 20px rgba(45, 212, 191, 0.15);
+  }
+  .btn:active { transform: scale(0.97); }
+
+  .status-bar {
+    text-align: center; margin-top: 16px;
+    font-family: 'Geist Mono', monospace; font-size: 0.82rem;
+    color: var(--accent-blue); min-height: 24px;
+    opacity: 0; transition: opacity 0.3s ease; position: relative; z-index: 2;
+  }
+  .status-bar.visible { opacity: 1; }
+
+  /* ============================
+     STEP CARDS
+     ============================ */
+  .steps-grid { display: grid; grid-template-columns: 1fr; gap: 18px; margin-top: 36px; }
+  @media (min-width: 768px) { .steps-grid { grid-template-columns: repeat(2, 1fr); } }
+
+  .step-card {
+    background: var(--bg-card); border: 1px solid var(--border-subtle);
+    border-radius: 14px; padding: 24px; position: relative;
+    transition: all 0.3s ease; overflow: hidden;
+  }
+  .step-card::before {
+    content: ''; position: absolute; top: 16px; bottom: 16px; left: 0;
+    width: 3px; border-radius: 0 3px 3px 0;
+  }
+  .step-card:nth-child(1)::before { background: var(--accent-indigo); }
+  .step-card:nth-child(2)::before { background: var(--accent-blue); }
+  .step-card:nth-child(3)::before { background: var(--accent-cyan); }
+  .step-card:nth-child(4)::before { background: var(--accent-amber); }
+  .step-card:nth-child(5)::before { background: var(--accent-teal); }
+  .step-card:nth-child(6)::before { background: var(--accent-violet); }
+  .step-card:nth-child(7)::before { background: var(--accent-rose); }
+  .step-card:nth-child(8)::before { background: var(--accent-lime); }
+  .step-card:nth-child(9)::before { background: var(--accent-electric); }
+  .step-card:nth-child(10)::before { background: var(--accent-indigo); }
+
+  .step-card:hover { border-color: var(--border-indigo); transform: translateY(-2px); }
+
+  .step-num { font-family: 'Geist Mono', monospace; font-size: 0.7rem; color: var(--text-muted); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 8px; }
+  .step-title { font-size: 1.1rem; font-weight: 600; color: var(--text-primary); margin-bottom: 8px; }
+  .step-desc { color: var(--text-secondary); font-weight: 300; font-size: 0.92rem; line-height: 1.65; }
+  .step-example {
+    margin-top: 12px; padding: 10px 14px;
+    background: rgba(99, 102, 241, 0.05); border-left: 2px solid var(--accent-indigo);
+    border-radius: 0 8px 8px 0; font-size: 0.82rem; color: var(--accent-electric);
+    font-family: 'Geist Mono', monospace; line-height: 1.5;
+  }
+
+  /* ============================
+     TRAINING LOSS PANEL
+     Animated "loss curve" canvas
+     ============================ */
+  .loss-panel { display: none; margin-top: 36px; border: 1px solid var(--border-subtle); border-radius: 14px; overflow: hidden; background: var(--bg-card); }
+  .loss-panel.visible { display: block; }
+  .loss-header { background: rgba(245, 158, 11, 0.08); padding: 16px 24px; font-weight: 600; font-size: 1rem; border-bottom: 1px solid var(--border-subtle); color: var(--accent-amber); display: flex; justify-content: space-between; align-items: center; }
+  .loss-body { padding: 24px; }
+  .loss-canvas-wrap { position: relative; width: 100%; max-width: 700px; margin: 0 auto; }
+  .loss-canvas { width: 100%; height: 280px; display: block; border-radius: 8px; background: rgba(8, 8, 15, 0.5); border: 1px solid var(--border-subtle); }
+  .loss-labels { display: flex; justify-content: space-between; margin-top: 6px; font-family: 'Geist Mono', monospace; font-size: 0.72rem; color: var(--text-muted); }
+  .loss-explanation { text-align: center; color: var(--text-secondary); font-size: 0.88rem; line-height: 1.6; font-weight: 300; max-width: 600px; margin: 16px auto 0; }
+
+  /* ============================
+     COMPARISON PANEL
+     ============================ */
+  .compare-panel { display: none; margin-top: 36px; border: 1px solid var(--border-subtle); border-radius: 14px; overflow: hidden; background: var(--bg-card); }
+  .compare-panel.visible { display: block; }
+  .compare-header { background: rgba(45, 212, 191, 0.08); padding: 16px 24px; font-weight: 600; font-size: 1rem; border-bottom: 1px solid var(--border-subtle); color: var(--accent-teal); }
+  .compare-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; }
+  @media (max-width: 700px) { .compare-grid { grid-template-columns: 1fr; } }
+  .compare-col { padding: 20px; }
+  .compare-col:not(:last-child) { border-right: 1px solid var(--border-subtle); }
+  @media (max-width: 700px) { .compare-col:not(:last-child) { border-right: none; border-bottom: 1px solid var(--border-subtle); } }
+  .compare-label { font-family: 'Geist Mono', monospace; font-size: 0.7rem; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 10px; }
+  .compare-col:nth-child(1) .compare-label { color: var(--accent-rose); }
+  .compare-col:nth-child(2) .compare-label { color: var(--accent-amber); }
+  .compare-col:nth-child(3) .compare-label { color: var(--accent-teal); }
+  .compare-q { font-weight: 600; margin-bottom: 8px; font-size: 0.92rem; }
+  .compare-a { color: var(--text-secondary); font-size: 0.88rem; line-height: 1.6; font-weight: 300; }
+  .compare-tag { display: inline-block; font-family: 'Geist Mono', monospace; font-size: 0.68rem; padding: 3px 10px; border-radius: 6px; margin-top: 10px; letter-spacing: 0.5px; }
+  .tag-bad { background: rgba(244, 63, 94, 0.12); color: var(--accent-rose); border: 1px solid rgba(244, 63, 94, 0.2); }
+  .tag-mid { background: rgba(245, 158, 11, 0.12); color: var(--accent-amber); border: 1px solid rgba(245, 158, 11, 0.2); }
+  .tag-good { background: rgba(45, 212, 191, 0.12); color: var(--accent-teal); border: 1px solid rgba(45, 212, 191, 0.2); }
+
+  /* ============================
+     TOOLTIP & FOOTER
+     ============================ */
+  .tooltip { position: fixed; background: #161828; border: 1px solid var(--border-indigo); color: var(--text-primary); padding: 10px 14px; border-radius: 10px; font-size: 0.8rem; pointer-events: none; opacity: 0; transition: opacity 0.2s ease; z-index: 100; max-width: 260px; font-family: 'Bricolage Grotesque', sans-serif; box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
+  .tooltip.visible { opacity: 1; }
+  .tooltip-title { font-weight: 600; color: var(--accent-blue); margin-bottom: 4px; font-size: 0.82rem; }
+
+  .footer { text-align: center; margin-top: 44px; padding-top: 20px; border-top: 1px solid var(--border-subtle); color: var(--text-muted); font-size: 0.78rem; }
+</style>
+</head>
+<body>
+
+<!-- NAVIGATION BAR -->
+<nav class="nav-bar">
+  <div class="nav-inner">
+    <a href="/" class="nav-brand">⚡ AI Concepts</a>
+    <div class="nav-links">
+      <a href="/" class="nav-link">Neural Networks</a>
+      <div class="nav-sep"></div>
+      <a href="/rag/how-rag-works" class="nav-link">How RAG Works</a>
+      <div class="nav-sep"></div>
+      <a href="/transformers/how-transformers-work" class="nav-link">Transformers</a>
+      <div class="nav-sep"></div>
+      <a href="/agentic-ai/how-agents-work" class="nav-link">Agentic AI</a>
+      <div class="nav-sep"></div>
+      <a href="/training/how-training-works" class="nav-link active">Training Pipeline</a>
+      <!-- Add more links here:
+      <div class="nav-sep"></div>
+      <a href="/prompt-injection" class="nav-link">Prompt Injection</a>
+      -->
+    </div>
+  </div>
+</nav>
+
+<!-- Tooltip -->
+<div class="tooltip" id="tooltip">
+  <div class="tooltip-title" id="tooltip-title"></div>
+  <div id="tooltip-text"></div>
+</div>
+
+<div class="container">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="subtitle">From Raw Data to Deployed Model</div>
+    <h1>How LLM Training Works</h1>
+    <p>Training an LLM is a multi-stage pipeline that transforms raw internet text into an AI that can hold conversations, write code, and reason. Each stage builds on the last — from data collection through alignment with human values.</p>
+  </div>
+
+  <!-- ============================
+       MAIN PIPELINE DIAGRAM (SVG)
+
+       The LLM training pipeline flows left-to-right across two rows:
+
+       Row 1: [Data Collection] → [Data Cleaning] → [Tokenization] → [Pre-Training]
+       Row 2: [SFT] → [RLHF / DPO] → [Evaluation] → [Deployed Model]
+
+       With phase labels above grouping them into:
+       DATA PREPARATION | FOUNDATION TRAINING | ALIGNMENT | DEPLOYMENT
+       ============================ -->
+  <div class="diagram-section">
+    <svg class="diagram-svg" viewBox="0 0 960 440" xmlns="http://www.w3.org/2000/svg">
+
+      <defs>
+        <marker id="arr-i" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#6366f1" opacity="0.6" />
+        </marker>
+      </defs>
+
+      <!-- ============================
+           PHASE GROUPING BRACKETS (top)
+           ============================ -->
+
+      <!-- Phase 1: Data Preparation -->
+      <rect x="22" y="18" width="465" height="28" rx="6"
+        fill="rgba(99, 102, 241, 0.05)" stroke="rgba(99, 102, 241, 0.15)" stroke-width="1" />
+      <text class="phase-label" x="254" y="36" fill="#6366f1">PHASE 1 — DATA PREPARATION</text>
+
+      <!-- Phase 2: Foundation Training -->
+      <rect x="500" y="18" width="200" height="28" rx="6"
+        fill="rgba(245, 158, 11, 0.05)" stroke="rgba(245, 158, 11, 0.15)" stroke-width="1" />
+      <text class="phase-label" x="600" y="36" fill="#f59e0b">PHASE 2 — FOUNDATION</text>
+
+      <!-- Phase 3: Alignment -->
+      <rect x="22" y="205" width="462" height="28" rx="6"
+        fill="rgba(45, 212, 191, 0.05)" stroke="rgba(45, 212, 191, 0.15)" stroke-width="1" />
+      <text class="phase-label" x="253" y="223" fill="#2dd4bf">PHASE 3 — ALIGNMENT</text>
+
+      <!-- Phase 4: Deployment -->
+      <rect x="500" y="205" width="435" height="28" rx="6"
+        fill="rgba(132, 204, 22, 0.05)" stroke="rgba(132, 204, 22, 0.15)" stroke-width="1" />
+      <text class="phase-label" x="717" y="223" fill="#84cc16">PHASE 4 — EVALUATION &amp; DEPLOYMENT</text>
+
+      <!-- ============================
+           ROW 1 ARROWS
+           ============================ -->
+      <line class="flow-arrow" id="fa-1" x1="177" y1="95" x2="195" y2="95" stroke="#6366f1" stroke-opacity="0.1" stroke-width="1.5" marker-end="url(#arr-i)" />
+      <line class="flow-arrow" id="fa-2" x1="355" y1="95" x2="373" y2="95" stroke="#6366f1" stroke-opacity="0.1" stroke-width="1.5" marker-end="url(#arr-i)" />
+      <line class="flow-arrow" id="fa-3" x1="530" y1="95" x2="548" y2="95" stroke="#6366f1" stroke-opacity="0.1" stroke-width="1.5" marker-end="url(#arr-i)" />
+
+      <!-- Row connector: Pre-Training → down → SFT -->
+      <path class="flow-arrow" id="fa-4" d="M 700 130 L 700 175 L 140 175 L 140 245"
+        fill="none" stroke="#6366f1" stroke-opacity="0.1" stroke-width="1.5" marker-end="url(#arr-i)" />
+
+      <!-- ROW 2 ARROWS -->
+      <line class="flow-arrow" id="fa-5" x1="250" y1="285" x2="268" y2="285" stroke="#6366f1" stroke-opacity="0.1" stroke-width="1.5" marker-end="url(#arr-i)" />
+      <line class="flow-arrow" id="fa-6" x1="485" y1="285" x2="503" y2="285" stroke="#6366f1" stroke-opacity="0.1" stroke-width="1.5" marker-end="url(#arr-i)" />
+      <line class="flow-arrow" id="fa-7" x1="680" y1="285" x2="698" y2="285" stroke="#6366f1" stroke-opacity="0.1" stroke-width="1.5" marker-end="url(#arr-i)" />
+
+      <!-- ============================
+           ROW 1 NODES: Data Prep + Pre-Training
+           ============================ -->
+
+      <!-- NODE 1: Data Collection -->
+      <g class="pipe-node" id="node-collect"
+         data-tip-title="1. Data Collection"
+         data-tip-text="Massive amounts of text are gathered from the internet: websites, books, code repositories, academic papers, forums, Wikipedia. Trillions of tokens from diverse sources.">
+        <rect x="25" y="58" width="150" height="74" rx="11"
+          fill="rgba(99, 102, 241, 0.07)" stroke="rgba(99, 102, 241, 0.3)" stroke-width="1.5" />
+        <text x="55" y="90" font-size="18">🌐</text>
+        <text x="78" y="88" font-family="Bricolage Grotesque" font-size="12" font-weight="600" fill="#dde0f0">Data</text>
+        <text x="78" y="104" font-family="Bricolage Grotesque" font-size="12" font-weight="600" fill="#dde0f0">Collection</text>
+        <text x="100" y="124" font-family="Geist Mono" font-size="7" fill="#585c78" text-anchor="middle" letter-spacing="1">STEP 1</text>
+      </g>
+
+      <!-- NODE 2: Data Cleaning -->
+      <g class="pipe-node" id="node-clean"
+         data-tip-title="2. Data Cleaning & Filtering"
+         data-tip-text="Raw data is filtered to remove duplicates, low-quality content, toxic/harmful material, personal info (PII), and copyrighted content. Quality filters keep only useful training data.">
+        <rect x="200" y="58" width="153" height="74" rx="11"
+          fill="rgba(129, 140, 248, 0.07)" stroke="rgba(129, 140, 248, 0.3)" stroke-width="1.5" />
+        <text x="230" y="90" font-size="18">🧹</text>
+        <text x="254" y="88" font-family="Bricolage Grotesque" font-size="12" font-weight="600" fill="#dde0f0">Data Cleaning</text>
+        <text x="254" y="104" font-family="Bricolage Grotesque" font-size="12" font-weight="600" fill="#dde0f0">& Filtering</text>
+        <text x="276" y="124" font-family="Geist Mono" font-size="7" fill="#585c78" text-anchor="middle" letter-spacing="1">STEP 2</text>
+      </g>
+
+      <!-- NODE 3: Tokenization -->
+      <g class="pipe-node" id="node-tokenize"
+         data-tip-title="3. Tokenization"
+         data-tip-text="Text is split into tokens (subword pieces) and converted to numerical IDs. A tokenizer vocabulary is trained (BPE/SentencePiece). 'unhappiness' → ['un', 'happi', 'ness'] → [348, 12902, 655].">
+        <rect x="378" y="58" width="150" height="74" rx="11"
+          fill="rgba(56, 189, 248, 0.07)" stroke="rgba(56, 189, 248, 0.3)" stroke-width="1.5" />
+        <text x="408" y="90" font-size="18">✂️</text>
+        <text x="432" y="88" font-family="Bricolage Grotesque" font-size="12" font-weight="600" fill="#dde0f0">Tokenization</text>
+        <text x="432" y="104" font-family="Geist Mono" font-size="9" fill="#585c78">text → token IDs</text>
+        <text x="453" y="124" font-family="Geist Mono" font-size="7" fill="#585c78" text-anchor="middle" letter-spacing="1">STEP 3</text>
+      </g>
+
+      <!-- NODE 4: Pre-Training -->
+      <g class="pipe-node" id="node-pretrain"
+         data-tip-title="4. Pre-Training (Next Token Prediction)"
+         data-tip-text="The BIG step. The model learns to predict the next token, billions of times. Trained on thousands of GPUs for weeks/months. This is where it learns language, facts, reasoning — costing $10M-$100M+ in compute.">
+        <rect x="553" y="54" width="145" height="82" rx="11"
+          fill="rgba(245, 158, 11, 0.08)" stroke="rgba(245, 158, 11, 0.35)" stroke-width="2" />
+        <text x="583" y="88" font-size="18">⚡</text>
+        <text x="607" y="86" font-family="Bricolage Grotesque" font-size="12" font-weight="700" fill="#dde0f0">Pre-Training</text>
+        <text x="607" y="102" font-family="Geist Mono" font-size="8" fill="#8e92b0">next token</text>
+        <text x="607" y="114" font-family="Geist Mono" font-size="8" fill="#8e92b0">prediction</text>
+        <text x="626" y="130" font-family="Geist Mono" font-size="7" fill="#585c78" text-anchor="middle" letter-spacing="1">STEP 4</text>
+      </g>
+
+      <!-- Pre-training stats callout -->
+      <g opacity="0.5">
+        <rect x="720" y="56" width="218" height="80" rx="8"
+          fill="none" stroke="rgba(245, 158, 11, 0.15)" stroke-width="1" stroke-dasharray="4 3" />
+        <text x="829" y="74" font-family="Geist Mono" font-size="8" fill="#f59e0b" text-anchor="middle" letter-spacing="1">PRE-TRAINING SCALE</text>
+        <text x="740" y="92" font-family="Geist Mono" font-size="8" fill="#585c78">📊 Trillions of tokens</text>
+        <text x="740" y="106" font-family="Geist Mono" font-size="8" fill="#585c78">🖥️ 1,000s-10,000s of GPUs</text>
+        <text x="740" y="120" font-family="Geist Mono" font-size="8" fill="#585c78">⏱️ Weeks to months</text>
+        <text x="740" y="134" font-family="Geist Mono" font-size="8" fill="#585c78">💰 $10M–$100M+ compute</text>
+        <line x1="720" y1="95" x2="700" y2="95" stroke="rgba(245, 158, 11, 0.15)" stroke-width="1" stroke-dasharray="4 3" />
+      </g>
+
+      <!-- Transition label -->
+      <text x="420" y="170" font-family="Geist Mono" font-size="7" fill="#585c78" text-anchor="middle" letter-spacing="1.5">
+        BASE MODEL COMPLETE — NOW MAKE IT USEFUL ↓
+      </text>
+
+      <!-- ============================
+           ROW 2 NODES: Alignment + Deployment
+           ============================ -->
+
+      <!-- NODE 5: Supervised Fine-Tuning (SFT) -->
+      <g class="pipe-node" id="node-sft"
+         data-tip-title="5. Supervised Fine-Tuning (SFT)"
+         data-tip-text="The base model is trained on curated (prompt, ideal response) pairs written by humans. This teaches it HOW to be helpful — following instructions, formatting answers, being a good assistant.">
+        <rect x="25" y="245" width="222" height="80" rx="11"
+          fill="rgba(45, 212, 191, 0.07)" stroke="rgba(45, 212, 191, 0.3)" stroke-width="1.5" />
+        <text x="58" y="280" font-size="18">👩‍🏫</text>
+        <text x="84" y="278" font-family="Bricolage Grotesque" font-size="12" font-weight="600" fill="#dde0f0">Supervised Fine-Tuning</text>
+        <text x="84" y="296" font-family="Geist Mono" font-size="8" fill="#8e92b0">"Here's how a good answer looks"</text>
+        <text x="136" y="318" font-family="Geist Mono" font-size="7" fill="#585c78" text-anchor="middle" letter-spacing="1">STEP 5</text>
+      </g>
+
+      <!-- NODE 6: RLHF / DPO -->
+      <g class="pipe-node" id="node-rlhf"
+         data-tip-title="6. RLHF / DPO (Alignment)"
+         data-tip-text="Humans rank model outputs from best to worst. A reward model learns these preferences. The LLM is then trained to maximize the reward — making it more helpful, honest, and harmless. DPO is a simpler alternative that skips the reward model.">
+        <rect x="273" y="245" width="210" height="80" rx="11"
+          fill="rgba(192, 132, 252, 0.08)" stroke="rgba(192, 132, 252, 0.3)" stroke-width="1.5" />
+        <text x="303" y="280" font-size="18">🏆</text>
+        <text x="328" y="278" font-family="Bricolage Grotesque" font-size="12" font-weight="700" fill="#dde0f0">RLHF / DPO</text>
+        <text x="328" y="296" font-family="Geist Mono" font-size="8" fill="#8e92b0">"Which answer is better?"</text>
+        <text x="328" y="310" font-family="Geist Mono" font-size="8" fill="#8e92b0">learn human preferences</text>
+        <text x="378" y="318" font-family="Geist Mono" font-size="7" fill="#585c78" text-anchor="middle" letter-spacing="1">STEP 6</text>
+      </g>
+
+      <!-- RLHF sub-steps annotation -->
+      <g opacity="0.5">
+        <rect x="270" y="335" width="216" height="62" rx="8"
+          fill="none" stroke="rgba(192, 132, 252, 0.15)" stroke-width="1" stroke-dasharray="4 3" />
+        <text x="378" y="352" font-family="Geist Mono" font-size="7" fill="#c084fc" text-anchor="middle" letter-spacing="1">RLHF SUB-STEPS</text>
+        <text x="284" y="368" font-family="Geist Mono" font-size="8" fill="#585c78">1. Humans rank outputs A > B > C</text>
+        <text x="284" y="382" font-family="Geist Mono" font-size="8" fill="#585c78">2. Train reward model on rankings</text>
+        <text x="284" y="396" font-family="Geist Mono" font-size="8" fill="#585c78">3. Optimize LLM via PPO / DPO</text>
+      </g>
+
+      <!-- NODE 7: Evaluation & Safety -->
+      <g class="pipe-node" id="node-eval"
+         data-tip-title="7. Evaluation & Red-Teaming"
+         data-tip-text="The model is tested on benchmarks (MMLU, HumanEval, etc.), red-teamed for safety vulnerabilities, tested for bias, and evaluated by human raters. Failures loop back to more fine-tuning.">
+        <rect x="508" y="245" width="170" height="80" rx="11"
+          fill="rgba(132, 204, 22, 0.07)" stroke="rgba(132, 204, 22, 0.3)" stroke-width="1.5" />
+        <text x="540" y="280" font-size="18">🧪</text>
+        <text x="565" y="278" font-family="Bricolage Grotesque" font-size="12" font-weight="600" fill="#dde0f0">Evaluation</text>
+        <text x="565" y="296" font-family="Geist Mono" font-size="8" fill="#8e92b0">benchmarks, red-team</text>
+        <text x="565" y="310" font-family="Geist Mono" font-size="8" fill="#8e92b0">safety, bias testing</text>
+        <text x="593" y="318" font-family="Geist Mono" font-size="7" fill="#585c78" text-anchor="middle" letter-spacing="1">STEP 7</text>
+      </g>
+
+      <!-- NODE 8: Deployed Model -->
+      <g class="pipe-node" id="node-deploy"
+         data-tip-title="8. Deployed Model"
+         data-tip-text="The final model is optimized for inference (quantization, distillation), deployed to servers, and made available via API or product. Continuous monitoring and updates follow.">
+        <rect x="703" y="245" width="230" height="80" rx="11"
+          fill="rgba(99, 102, 241, 0.1)" stroke="rgba(99, 102, 241, 0.4)" stroke-width="1.5" />
+        <text x="738" y="280" font-size="18">🚀</text>
+        <text x="763" y="278" font-family="Bricolage Grotesque" font-size="13" font-weight="700" fill="#dde0f0">Deployed Model</text>
+        <text x="763" y="296" font-family="Geist Mono" font-size="8" fill="#8e92b0">API, claude.ai, products</text>
+        <text x="763" y="310" font-family="Geist Mono" font-size="8" fill="#8e92b0">quantized, monitored, served</text>
+        <text x="818" y="318" font-family="Geist Mono" font-size="7" fill="#585c78" text-anchor="middle" letter-spacing="1">STEP 8</text>
+      </g>
+
+      <!-- Bottom summary -->
+      <text x="480" y="420" font-family="Geist Mono" font-size="8" fill="#585c78" text-anchor="middle" letter-spacing="1.5">
+        DATA COLLECTION → CLEANING → TOKENIZATION → PRE-TRAINING → SFT → RLHF → EVALUATION → DEPLOYMENT
+      </text>
+
+    </svg>
+
+    <!-- CONTROLS -->
+    <div class="controls">
+      <button class="btn btn-walk" id="btn-walk" onclick="walkthrough()">▶ Walk Through the Pipeline</button>
+      <button class="btn btn-loss" id="btn-loss" onclick="toggleLoss()">📉 Training Loss Curve</button>
+      <button class="btn btn-compare" id="btn-compare" onclick="toggleCompare()">⚖ Base vs SFT vs RLHF</button>
+    </div>
+    <div class="status-bar" id="status-bar"></div>
+  </div>
+
+  <!-- ============================
+       TRAINING LOSS CURVE PANEL
+       Animated canvas showing how loss decreases during training
+       ============================ -->
+  <div class="loss-panel" id="loss-panel">
+    <div class="loss-header">
+      <span>📉 Training Loss Over Time — Watch the model learn</span>
+      <button class="btn btn-walk" onclick="drawLoss()" style="padding:6px 16px; font-size:0.75rem;">▶ Replay</button>
+    </div>
+    <div class="loss-body">
+      <div class="loss-canvas-wrap">
+        <canvas class="loss-canvas" id="loss-canvas"></canvas>
+        <div class="loss-labels">
+          <span>Training Steps →</span>
+          <span>← Loss (error) decreases as model learns</span>
+        </div>
+      </div>
+      <div class="loss-explanation">
+        The <strong>loss curve</strong> shows how wrong the model's predictions are over time. High loss = bad predictions. As training progresses, the loss drops — the model gets better at predicting the next token. The curve follows a <strong>power law</strong>: big gains early, then diminishing returns.
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================
+       COMPARISON PANEL: Base vs SFT vs RLHF
+       ============================ -->
+  <div class="compare-panel" id="compare-panel">
+    <div class="compare-header">⚖️ &nbsp;Same Prompt — Three Stages of Training</div>
+    <div class="compare-grid">
+      <div class="compare-col">
+        <div class="compare-label">🔴 Base Model (Pre-trained only)</div>
+        <div class="compare-q">"Explain quantum computing simply."</div>
+        <div class="compare-a">quantum computing is a field of study that focuses on the development of computer based technologies centered around the principles of quantum theory quantum computing uses qubits quantum computing quantum computing uses quantum mechanical phenomena such as superposition and entanglement to</div>
+        <div class="compare-tag tag-bad">⚠ RAMBLING — no structure, repetitive</div>
+      </div>
+      <div class="compare-col">
+        <div class="compare-label">🟡 After SFT (Fine-tuned)</div>
+        <div class="compare-q">"Explain quantum computing simply."</div>
+        <div class="compare-a">Quantum computing uses quantum bits (qubits) instead of regular bits. While a normal bit is 0 or 1, a qubit can be both at once (superposition). This lets quantum computers solve certain problems much faster than classical computers, like breaking encryption or simulating molecules.</div>
+        <div class="compare-tag tag-mid">✓ STRUCTURED — clear, helpful, but bland</div>
+      </div>
+      <div class="compare-col">
+        <div class="compare-label">🟢 After RLHF (Aligned)</div>
+        <div class="compare-q">"Explain quantum computing simply."</div>
+        <div class="compare-a">Think of a regular computer as flipping coins — each coin lands heads (1) or tails (0). A quantum computer's coins spin in the air, being heads AND tails simultaneously. This "superposition" lets it explore many solutions at once, making it incredibly powerful for specific problems like drug discovery and cryptography — though it's not a magic speed-up for everything.</div>
+        <div class="compare-tag tag-good">✓ ENGAGING — uses analogy, nuanced, helpful</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================
+       STEP DETAIL CARDS
+       ============================ -->
+  <div class="steps-grid">
+
+    <div class="step-card">
+      <div class="step-num">Step 01</div>
+      <div class="step-title">🌐 Data Collection</div>
+      <div class="step-desc">
+        Massive datasets are assembled from across the internet: web crawls (Common Crawl), books, scientific papers, code repositories (GitHub), Wikipedia, forums, and more. The goal is <strong>diversity</strong> — the model needs exposure to every domain, language, and writing style.
+      </div>
+      <div class="step-example">Common Crawl alone contains ~250 billion pages. GPT-4 was trained on an estimated 13 trillion tokens.</div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-num">Step 02</div>
+      <div class="step-title">🧹 Data Cleaning & Filtering</div>
+      <div class="step-desc">
+        Raw web data is <strong>noisy</strong>. This step removes: duplicates, low-quality pages (spam, SEO junk), toxic/harmful content, personally identifiable information (PII), and near-duplicate passages. Quality classifiers score each document. Data is mixed by domain in specific ratios — more code, more books, less social media.
+      </div>
+      <div class="step-example">A typical pipeline keeps only 10-30% of raw data after filtering. The quality of data directly impacts model quality.</div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-num">Step 03</div>
+      <div class="step-title">✂️ Tokenization</div>
+      <div class="step-desc">
+        Clean text is split into <strong>tokens</strong> using algorithms like BPE (Byte Pair Encoding) or SentencePiece. A vocabulary is built (typically 32K-100K tokens). Common words stay whole; rare words get broken into pieces. Every token gets a numerical ID the model can process.
+      </div>
+      <div class="step-example">"unhappiness" → ["un", "happi", "ness"] → [348, 12902, 655]. The tokenizer is trained once and frozen.</div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-num">Step 04</div>
+      <div class="step-title">⚡ Pre-Training</div>
+      <div class="step-desc">
+        The <strong>most expensive step</strong>. The model is trained on the simple task of <strong>next-token prediction</strong>: given all previous tokens, predict the next one. It does this billions of times across the entire dataset. Through this process, the model learns grammar, facts, reasoning, code patterns, and world knowledge — all encoded in its weights.
+      </div>
+      <div class="step-example">This is "self-supervised" — no human labels needed. The text itself IS the training signal. Cost: $10M-$100M+ in GPU compute.</div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-num">Step 05</div>
+      <div class="step-title">👩‍🏫 Supervised Fine-Tuning (SFT)</div>
+      <div class="step-desc">
+        The base model can predict text, but it doesn't know how to be a helpful assistant. SFT trains it on thousands of <strong>(prompt, ideal response)</strong> pairs written by human experts. This teaches it to follow instructions, format answers well, stay on topic, and be helpful.
+      </div>
+      <div class="step-example">"Explain X" → [well-structured, clear explanation]. "Write code for Y" → [clean, commented code]. Typically 10K-100K examples.</div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-num">Step 06</div>
+      <div class="step-title">🏆 RLHF / DPO (Alignment)</div>
+      <div class="step-desc">
+        The model generates multiple responses. Human raters <strong>rank them</strong> from best to worst. A <strong>reward model</strong> is trained on these rankings to score any output. Then the LLM is optimized (via PPO or DPO) to produce responses that score higher — becoming more helpful, honest, and harmless. This is where the model develops its "personality" and values.
+      </div>
+      <div class="step-example">RLHF: Requires a separate reward model + PPO training. DPO: Simpler, directly optimizes from preference pairs. Both align the model with human values.</div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-num">Step 07</div>
+      <div class="step-title">🧪 Evaluation & Red-Teaming</div>
+      <div class="step-desc">
+        Before release, the model undergoes rigorous testing: <strong>benchmarks</strong> (MMLU, HumanEval, MATH), <strong>red-teaming</strong> (adversarial attacks to find safety flaws), <strong>bias testing</strong>, and human evaluation. Failures are identified and addressed through additional fine-tuning or safety layers.
+      </div>
+      <div class="step-example">Benchmarks: MMLU (knowledge), HumanEval (code), GSM8K (math). Red-teaming: trying to make the model produce harmful outputs.</div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-num">Step 08</div>
+      <div class="step-title">🚀 Deployment</div>
+      <div class="step-desc">
+        The final model is optimized for serving: <strong>quantization</strong> (reducing precision from fp32 → int8 to cut memory/cost), <strong>distillation</strong> (training smaller models to mimic the large one), and <strong>inference optimization</strong> (KV caching, speculative decoding). It's then deployed to servers and made available via API or product — with ongoing monitoring, safety guardrails, and continuous improvement.
+      </div>
+      <div class="step-example">This is where F5's AI Guardrails, rate limiting, and security controls come in — protecting deployed models in production.</div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-num">Key Concept</div>
+      <div class="step-title">📐 Scaling Laws</div>
+      <div class="step-desc">
+        Research has shown that model performance follows predictable <strong>scaling laws</strong>: performance improves as a power law with more data, more compute, and more parameters. This is why labs keep making bigger models — the recipe is surprisingly predictable. But there are diminishing returns, leading to more focus on data quality and alignment techniques.
+      </div>
+      <div class="step-example">Chinchilla scaling: a 70B model trained on 1.4T tokens outperforms a 280B model trained on 300B tokens. Data matters as much as size.</div>
+    </div>
+
+    <div class="step-card">
+      <div class="step-num">Security Note</div>
+      <div class="step-title">🔒 Training Data Security</div>
+      <div class="step-desc">
+        Every stage of the training pipeline has security implications: <strong>data poisoning</strong> (injecting malicious data to influence model behavior), <strong>membership inference</strong> (detecting if specific data was used in training), <strong>model extraction</strong> (stealing model weights), and <strong>prompt injection</strong> in fine-tuning data. This is why frameworks like NIST AI RMF and MITRE ATLAS map these attack surfaces.
+      </div>
+      <div class="step-example">Relevant to your work: MITRE ATLAS techniques like Poison Training Data (AML.T0020) and Model Inversion (AML.T0049) map directly to this pipeline.</div>
+    </div>
+  </div>
+
+  <div class="footer">
+    Interactive LLM Training Pipeline Diagram — Walk through the stages, visualize the loss curve, or compare training phases
+  </div>
+</div>
+
+<script>
+  // ============================
+  // TOOLTIP
+  // ============================
+  const tooltipEl = document.getElementById('tooltip');
+  const tooltipTitle = document.getElementById('tooltip-title');
+  const tooltipText = document.getElementById('tooltip-text');
+
+  document.querySelectorAll('.pipe-node').forEach(node => {
+    node.addEventListener('mouseenter', () => {
+      tooltipTitle.textContent = node.getAttribute('data-tip-title');
+      tooltipText.textContent = node.getAttribute('data-tip-text');
+      tooltipEl.classList.add('visible');
+    });
+    node.addEventListener('mousemove', (e) => {
+      tooltipEl.style.left = (e.clientX + 16) + 'px';
+      tooltipEl.style.top = (e.clientY - 10) + 'px';
+    });
+    node.addEventListener('mouseleave', () => { tooltipEl.classList.remove('visible'); });
+  });
+
+  // ============================
+  // WALKTHROUGH ANIMATION
+  // ============================
+  let isWalking = false;
+
+  const walkthroughSteps = [
+    { nodeId: 'node-collect',  arrowIds: ['fa-1'],  status: '🌐 Step 1: Collecting trillions of tokens from the internet — web, books, code, papers...' },
+    { nodeId: 'node-clean',    arrowIds: ['fa-2'],  status: '🧹 Step 2: Filtering out junk — dedup, PII removal, toxicity filtering, quality scoring...' },
+    { nodeId: 'node-tokenize', arrowIds: ['fa-3'],  status: '✂️ Step 3: Splitting text into tokens and converting to numerical IDs...' },
+    { nodeId: 'node-pretrain', arrowIds: ['fa-4'],  status: '⚡ Step 4: Pre-training — next token prediction on thousands of GPUs for months...' },
+    { nodeId: 'node-sft',      arrowIds: ['fa-5'],  status: '👩‍🏫 Step 5: Supervised fine-tuning — learning from human-written ideal responses...' },
+    { nodeId: 'node-rlhf',     arrowIds: ['fa-6'],  status: '🏆 Step 6: RLHF — human raters rank outputs, model optimizes for their preferences...' },
+    { nodeId: 'node-eval',     arrowIds: ['fa-7'],  status: '🧪 Step 7: Evaluation — benchmarks, red-teaming, bias testing, safety checks...' },
+    { nodeId: 'node-deploy',   arrowIds: [],         status: '🚀 Step 8: Deployed! Quantized, optimized, and served to millions of users.' },
+  ];
+
+  function walkthrough() {
+    if (isWalking) return;
+    isWalking = true;
+    const btn = document.getElementById('btn-walk');
+    const statusBar = document.getElementById('status-bar');
+    btn.textContent = '▶ Walking through...';
+    btn.style.opacity = '0.6';
+    statusBar.classList.add('visible');
+
+    walkthroughSteps.forEach((step, idx) => {
+      setTimeout(() => {
+        statusBar.textContent = step.status;
+        const node = document.getElementById(step.nodeId);
+        node.classList.add('active');
+        setTimeout(() => node.classList.remove('active'), 1000);
+        step.arrowIds.forEach(id => {
+          const arrow = document.getElementById(id);
+          arrow.classList.add('active');
+          setTimeout(() => arrow.classList.remove('active'), 800);
+        });
+      }, idx * 1300);
+    });
+
+    setTimeout(() => {
+      btn.textContent = '▶ Walk Through the Pipeline';
+      btn.style.opacity = '1';
+      statusBar.textContent = '🎉 Complete! From raw text to deployed AI in ~8 stages.';
+      setTimeout(() => statusBar.classList.remove('visible'), 3000);
+      isWalking = false;
+    }, walkthroughSteps.length * 1300 + 1000);
+  }
+
+  // ============================
+  // TRAINING LOSS CURVE
+  // Animated canvas drawing showing loss decreasing over time.
+  // Follows a power-law curve with some noise to look realistic.
+  // ============================
+  let lossDrawing = false;
+
+  function drawLoss() {
+    if (lossDrawing) return;
+    lossDrawing = true;
+
+    const canvas = document.getElementById('loss-canvas');
+    const ctx = canvas.getContext('2d');
+
+    // Set canvas resolution (high DPI)
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * 2;
+    canvas.height = rect.height * 2;
+    ctx.scale(2, 2);
+
+    const w = rect.width;
+    const h = rect.height;
+    const padding = { top: 30, right: 20, bottom: 30, left: 50 };
+
+    // Clear canvas
+    ctx.clearRect(0, 0, w, h);
+
+    // Draw axes
+    ctx.strokeStyle = 'rgba(142, 146, 176, 0.2)';
+    ctx.lineWidth = 1;
+
+    // Y axis
+    ctx.beginPath();
+    ctx.moveTo(padding.left, padding.top);
+    ctx.lineTo(padding.left, h - padding.bottom);
+    ctx.stroke();
+
+    // X axis
+    ctx.beginPath();
+    ctx.moveTo(padding.left, h - padding.bottom);
+    ctx.lineTo(w - padding.right, h - padding.bottom);
+    ctx.stroke();
+
+    // Axis labels
+    ctx.fillStyle = '#585c78';
+    ctx.font = '10px "Geist Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('Training Steps', w / 2, h - 6);
+
+    ctx.save();
+    ctx.translate(12, h / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillText('Loss', 0, 0);
+    ctx.restore();
+
+    // Y-axis tick labels
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#585c78';
+    ctx.font = '9px "Geist Mono", monospace';
+    const plotH = h - padding.top - padding.bottom;
+    for (let i = 0; i <= 4; i++) {
+      const y = padding.top + (plotH * i / 4);
+      const val = (10 - i * 2.5).toFixed(1);
+      ctx.fillText(val, padding.left - 6, y + 3);
+      // Grid lines
+      ctx.strokeStyle = 'rgba(142, 146, 176, 0.06)';
+      ctx.beginPath();
+      ctx.moveTo(padding.left + 1, y);
+      ctx.lineTo(w - padding.right, y);
+      ctx.stroke();
+    }
+
+    // Generate realistic loss curve data points
+    // Power law decay: loss = a * step^(-b) + noise
+    const totalPoints = 300;
+    const plotW = w - padding.left - padding.right;
+    const points = [];
+
+    for (let i = 0; i < totalPoints; i++) {
+      const t = i / totalPoints;
+      // Power law curve with a floor
+      const baseLoss = 9 * Math.pow(t + 0.02, -0.35) - 5.5;
+      // Add realistic noise that decreases over time
+      const noise = (Math.random() - 0.5) * 0.6 * (1 - t * 0.7);
+      const loss = Math.max(0.3, Math.min(10, baseLoss + noise));
+
+      const x = padding.left + (plotW * i / totalPoints);
+      const y = padding.top + plotH * (1 - (loss / 10));
+      points.push({ x, y, loss });
+    }
+
+    // Animate drawing the curve point by point
+    let drawn = 0;
+    const batchSize = 3;  // draw 3 points per frame for speed
+
+    function animateFrame() {
+      const end = Math.min(drawn + batchSize, points.length);
+
+      // Draw the loss line segment
+      ctx.strokeStyle = '#6366f1';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      if (drawn > 0) {
+        ctx.moveTo(points[drawn - 1].x, points[drawn - 1].y);
+      }
+      for (let i = drawn; i < end; i++) {
+        if (i === 0) {
+          ctx.moveTo(points[i].x, points[i].y);
+        } else {
+          ctx.lineTo(points[i].x, points[i].y);
+        }
+      }
+      ctx.stroke();
+
+      // Draw a glowing dot at the current position
+      if (end > 0) {
+        const last = points[end - 1];
+        ctx.beginPath();
+        ctx.arc(last.x, last.y, 3, 0, Math.PI * 2);
+        ctx.fillStyle = '#818cf8';
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(last.x, last.y, 6, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(129, 140, 248, 0.2)';
+        ctx.fill();
+      }
+
+      drawn = end;
+
+      if (drawn < points.length) {
+        requestAnimationFrame(animateFrame);
+      } else {
+        // Draw phase annotations after curve is complete
+        ctx.font = '9px "Geist Mono", monospace';
+        ctx.textAlign = 'center';
+
+        // "Rapid learning" zone
+        ctx.fillStyle = 'rgba(245, 158, 11, 0.7)';
+        ctx.fillText('↓ Rapid learning', padding.left + plotW * 0.12, padding.top + 14);
+
+        // "Diminishing returns" zone
+        ctx.fillStyle = 'rgba(45, 212, 191, 0.7)';
+        ctx.fillText('Diminishing returns →', padding.left + plotW * 0.7, padding.top + plotH * 0.72);
+
+        lossDrawing = false;
+      }
+    }
+
+    requestAnimationFrame(animateFrame);
+  }
+
+  // ============================
+  // TOGGLE PANELS
+  // ============================
+  function toggleLoss() {
+    const panel = document.getElementById('loss-panel');
+    const btn = document.getElementById('btn-loss');
+    if (panel.classList.contains('visible')) {
+      panel.classList.remove('visible');
+      btn.textContent = '📉 Training Loss Curve';
+    } else {
+      panel.classList.add('visible');
+      btn.textContent = '📉 Hide Loss Curve';
+      setTimeout(() => {
+        panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        drawLoss();
+      }, 150);
+    }
+  }
+
+  function toggleCompare() {
+    const panel = document.getElementById('compare-panel');
+    const btn = document.getElementById('btn-compare');
+    if (panel.classList.contains('visible')) {
+      panel.classList.remove('visible');
+      btn.textContent = '⚖ Base vs SFT vs RLHF';
+    } else {
+      panel.classList.add('visible');
+      btn.textContent = '⚖ Hide Comparison';
+      setTimeout(() => panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100);
+    }
+  }
+</script>
+
+</body>
+</html>
