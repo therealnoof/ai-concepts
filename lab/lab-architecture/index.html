@@ -1,0 +1,1755 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LLM Fine-Tuning & RAG Lab — Architecture Diagram</title>
+
+    <!-- Google Fonts matching the ai-concepts repo style -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <style>
+        /* ============================================================
+           CSS VARIABLES — Central place to control colors & fonts
+           ============================================================ */
+        :root {
+            /* Dark background tones */
+            --bg-primary: #0a0e1a;
+            --bg-secondary: #111827;
+            --bg-card: #1a1f35;
+            --bg-card-hover: #222844;
+
+            /* Accent colors — each module gets its own color */
+            --accent-colab: #f9ab00;       /* Google Colab gold */
+            --accent-base: #60a5fa;        /* Module 1 — blue */
+            --accent-rag: #34d399;         /* Module 2 — green */
+            --accent-finetune: #f472b6;    /* Module 3 — pink */
+            --accent-eval: #a78bfa;        /* Module 4 — purple */
+            --accent-data: #fb923c;        /* Data layer — orange */
+
+            /* Text colors */
+            --text-primary: #e2e8f0;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+
+            /* Borders & dividers */
+            --border-subtle: rgba(255, 255, 255, 0.06);
+            --border-glow: rgba(96, 165, 250, 0.3);
+
+            /* Fonts */
+            --font-display: 'Outfit', sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+            --font-body: 'DM Sans', sans-serif;
+        }
+
+        /* ============================================================
+           RESET & BASE STYLES
+           ============================================================ */
+        *, *::before, *::after {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: var(--font-body);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* Subtle grid-dot background pattern */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px);
+            background-size: 32px 32px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* ============================================================
+           LAYOUT CONTAINERS
+           ============================================================ */
+        .page-wrapper {
+            position: relative;
+            z-index: 1;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem 2rem 6rem;
+        }
+
+        /* ============================================================
+           HEADER — Title, subtitle, breadcrumb
+           ============================================================ */
+        .page-header {
+            text-align: center;
+            padding: 3rem 0 2rem;
+            animation: fadeInDown 0.8s ease-out;
+        }
+
+        .breadcrumb {
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-bottom: 1.5rem;
+            letter-spacing: 0.05em;
+        }
+
+        .breadcrumb a {
+            color: var(--accent-base);
+            text-decoration: none;
+        }
+
+        .breadcrumb a:hover {
+            text-decoration: underline;
+        }
+
+        .page-header h1 {
+            font-family: var(--font-display);
+            font-weight: 800;
+            font-size: clamp(2rem, 5vw, 3.5rem);
+            line-height: 1.1;
+            margin-bottom: 1rem;
+            /* Gradient text effect */
+            background: linear-gradient(135deg, #60a5fa 0%, #34d399 40%, #f472b6 70%, #a78bfa 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .page-header .subtitle {
+            font-family: var(--font-body);
+            font-size: 1.15rem;
+            color: var(--text-secondary);
+            max-width: 700px;
+            margin: 0 auto 1.5rem;
+        }
+
+        .header-meta {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            flex-wrap: wrap;
+            font-family: var(--font-mono);
+            font-size: 0.78rem;
+            color: var(--text-muted);
+        }
+
+        .header-meta span {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .meta-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        /* ============================================================
+           SECTION TITLES
+           ============================================================ */
+        .section-title {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: 1.6rem;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .section-number {
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            font-weight: 600;
+            padding: 0.2rem 0.6rem;
+            border-radius: 6px;
+            letter-spacing: 0.05em;
+        }
+
+        .section-desc {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            margin-bottom: 2rem;
+            max-width: 800px;
+        }
+
+        /* ============================================================
+           DIAGRAM SECTIONS
+           ============================================================ */
+        .diagram-section {
+            margin-bottom: 4rem;
+            opacity: 0;
+            transform: translateY(30px);
+            transition: opacity 0.6s ease, transform 0.6s ease;
+        }
+
+        .diagram-section.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* ============================================================
+           OVERVIEW ARCHITECTURE — The big picture
+           ============================================================ */
+        .arch-overview {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1.5rem;
+        }
+
+        /* The main flow row — horizontal pipeline */
+        .flow-pipeline {
+            display: flex;
+            align-items: stretch;
+            gap: 0;
+            overflow-x: auto;
+            padding: 1rem 0;
+        }
+
+        .flow-stage {
+            flex: 1;
+            min-width: 180px;
+            position: relative;
+        }
+
+        .flow-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: 14px;
+            padding: 1.5rem;
+            text-align: center;
+            transition: all 0.3s ease;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 0.6rem;
+        }
+
+        .flow-card:hover {
+            background: var(--bg-card-hover);
+            transform: translateY(-4px);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        }
+
+        .flow-card .icon {
+            font-size: 2rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .flow-card .label {
+            font-family: var(--font-display);
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+
+        .flow-card .detail {
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            line-height: 1.4;
+        }
+
+        /* Arrow connector between flow stages */
+        .flow-arrow {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 50px;
+            color: var(--text-muted);
+            font-size: 1.4rem;
+            flex-shrink: 0;
+        }
+
+        .flow-arrow svg {
+            width: 40px;
+            height: 20px;
+        }
+
+        /* ============================================================
+           TECH STACK GRID
+           ============================================================ */
+        .tech-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+
+        .tech-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            padding: 1.25rem;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .tech-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            border-radius: 12px 12px 0 0;
+        }
+
+        .tech-card:hover {
+            background: var(--bg-card-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 24px rgba(0,0,0,0.25);
+        }
+
+        .tech-card .tech-role {
+            font-family: var(--font-mono);
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 0.5rem;
+        }
+
+        .tech-card .tech-name {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: 1.05rem;
+            margin-bottom: 0.3rem;
+        }
+
+        .tech-card .tech-why {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        /* Color-code each tech card's top bar */
+        .tech-card[data-color="colab"]::before { background: var(--accent-colab); }
+        .tech-card[data-color="colab"] .tech-role { color: var(--accent-colab); }
+
+        .tech-card[data-color="blue"]::before { background: var(--accent-base); }
+        .tech-card[data-color="blue"] .tech-role { color: var(--accent-base); }
+
+        .tech-card[data-color="green"]::before { background: var(--accent-rag); }
+        .tech-card[data-color="green"] .tech-role { color: var(--accent-rag); }
+
+        .tech-card[data-color="pink"]::before { background: var(--accent-finetune); }
+        .tech-card[data-color="pink"] .tech-role { color: var(--accent-finetune); }
+
+        .tech-card[data-color="purple"]::before { background: var(--accent-eval); }
+        .tech-card[data-color="purple"] .tech-role { color: var(--accent-eval); }
+
+        .tech-card[data-color="orange"]::before { background: var(--accent-data); }
+        .tech-card[data-color="orange"] .tech-role { color: var(--accent-data); }
+
+        /* ============================================================
+           MODULE TIMELINE — Horizontal 4-module lab progression
+           Flows left-to-right on desktop, stacks vertically on mobile
+           ============================================================ */
+        .module-timeline {
+            position: relative;
+            display: flex;              /* horizontal row on desktop */
+            align-items: stretch;
+            gap: 0;
+        }
+
+        /* Horizontal connecting line (sits behind the cards) */
+        .module-timeline::before {
+            content: '';
+            position: absolute;
+            /* Horizontal line: runs left→right, centered vertically at the dot row */
+            top: 28px;               /* vertically aligned with the dot centers */
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg,
+                var(--accent-base) 0%,
+                var(--accent-rag) 33%,
+                var(--accent-finetune) 66%,
+                var(--accent-eval) 100%
+            );
+            border-radius: 2px;
+            z-index: 0;
+        }
+
+        /* Each module item — takes equal width in the row */
+        .module-item {
+            position: relative;
+            flex: 1;
+            min-width: 0;              /* allow flex children to shrink */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            animation: fadeInUp 0.5s ease-out backwards;
+        }
+
+        .module-item:nth-child(1) { animation-delay: 0.1s; }
+        .module-item:nth-child(2) { animation-delay: 0.25s; }
+        .module-item:nth-child(3) { animation-delay: 0.4s; }
+        .module-item:nth-child(4) { animation-delay: 0.55s; }
+
+        /* Arrow connectors between module items (desktop only) */
+        .module-arrow {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 40px;
+            flex-shrink: 0;
+            padding-top: 12px;         /* align with the dot row */
+            color: var(--text-muted);
+            z-index: 1;
+        }
+
+        .module-arrow svg {
+            width: 32px;
+            height: 16px;
+        }
+
+        /* The numbered circle dot — sits above the card */
+        .module-dot {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--font-mono);
+            font-weight: 700;
+            font-size: 0.75rem;
+            color: var(--bg-primary);
+            z-index: 2;
+            margin-bottom: 0.75rem;
+            flex-shrink: 0;
+        }
+
+        /* The card body below each dot */
+        .module-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: 14px;
+            padding: 1.25rem;
+            transition: all 0.3s ease;
+            flex: 1;                   /* cards grow to equal height */
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .module-card:hover {
+            background: var(--bg-card-hover);
+            box-shadow: 0 6px 24px rgba(0,0,0,0.25);
+            transform: translateY(-4px);
+        }
+
+        .module-card .module-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 0.6rem;
+        }
+
+        .module-card .module-name {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: 1rem;
+        }
+
+        .module-card .module-time {
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            padding: 0.2rem 0.6rem;
+            border-radius: 20px;
+            border: 1px solid;
+            white-space: nowrap;
+        }
+
+        .module-card .module-desc {
+            color: var(--text-secondary);
+            font-size: 0.82rem;
+            margin-bottom: 0.75rem;
+            flex: 1;                   /* push notebook tag to bottom */
+        }
+
+        .module-card .module-notebook {
+            font-family: var(--font-mono);
+            font-size: 0.68rem;
+            color: var(--text-muted);
+            padding: 0.35rem 0.65rem;
+            background: rgba(0,0,0,0.3);
+            border-radius: 6px;
+            display: inline-block;
+            align-self: flex-start;
+        }
+
+        /* Per-module color theming */
+        .module-item[data-module="1"] .module-dot { background: var(--accent-base); }
+        .module-item[data-module="1"] .module-name { color: var(--accent-base); }
+        .module-item[data-module="1"] .module-time { color: var(--accent-base); border-color: rgba(96,165,250,0.3); }
+
+        .module-item[data-module="2"] .module-dot { background: var(--accent-rag); }
+        .module-item[data-module="2"] .module-name { color: var(--accent-rag); }
+        .module-item[data-module="2"] .module-time { color: var(--accent-rag); border-color: rgba(52,211,153,0.3); }
+
+        .module-item[data-module="3"] .module-dot { background: var(--accent-finetune); }
+        .module-item[data-module="3"] .module-name { color: var(--accent-finetune); }
+        .module-item[data-module="3"] .module-time { color: var(--accent-finetune); border-color: rgba(244,114,182,0.3); }
+
+        .module-item[data-module="4"] .module-dot { background: var(--accent-eval); }
+        .module-item[data-module="4"] .module-name { color: var(--accent-eval); }
+        .module-item[data-module="4"] .module-time { color: var(--accent-eval); border-color: rgba(167,139,250,0.3); }
+
+        /* ============================================================
+           DETAILED FLOW DIAGRAMS — RAG & Fine-Tuning
+           ============================================================ */
+        .detail-flow {
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .detail-flow::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+        }
+
+        .detail-flow.rag-flow::before {
+            background: linear-gradient(90deg, var(--accent-rag), var(--accent-base));
+        }
+
+        .detail-flow.ft-flow::before {
+            background: linear-gradient(90deg, var(--accent-finetune), var(--accent-data));
+        }
+
+        .detail-flow.eval-flow::before {
+            background: linear-gradient(90deg, var(--accent-eval), var(--accent-rag));
+        }
+
+        .detail-flow .flow-title {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: 1.25rem;
+            margin-bottom: 0.4rem;
+        }
+
+        .detail-flow .flow-subtitle {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-bottom: 1.5rem;
+        }
+
+        /* Horizontal step flow inside detail diagrams */
+        .step-flow {
+            display: flex;
+            align-items: flex-start;
+            gap: 0;
+            overflow-x: auto;
+            padding-bottom: 0.5rem;
+        }
+
+        .step-box {
+            flex: 1;
+            min-width: 140px;
+            text-align: center;
+        }
+
+        .step-icon {
+            width: 56px;
+            height: 56px;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            margin: 0 auto 0.6rem;
+            position: relative;
+        }
+
+        /* Subtle animated pulse on step icons */
+        .step-icon::after {
+            content: '';
+            position: absolute;
+            inset: -3px;
+            border-radius: 17px;
+            border: 1px solid;
+            opacity: 0;
+            animation: pulse-border 3s ease-in-out infinite;
+        }
+
+        .step-box:nth-child(1) .step-icon::after { animation-delay: 0s; }
+        .step-box:nth-child(2) .step-icon::after { animation-delay: 0.5s; }
+        .step-box:nth-child(3) .step-icon::after { animation-delay: 1s; }
+        .step-box:nth-child(4) .step-icon::after { animation-delay: 1.5s; }
+        .step-box:nth-child(5) .step-icon::after { animation-delay: 2s; }
+
+        .step-label {
+            font-family: var(--font-display);
+            font-weight: 600;
+            font-size: 0.85rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .step-detail {
+            font-family: var(--font-mono);
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+
+        .step-arrow {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 36px;
+            padding-top: 1rem;
+            color: var(--text-muted);
+        }
+
+        .step-arrow svg {
+            width: 28px;
+            height: 16px;
+        }
+
+        /* RAG-specific colors */
+        .rag-flow .step-icon { background: rgba(52, 211, 153, 0.12); border: 1px solid rgba(52, 211, 153, 0.2); }
+        .rag-flow .step-icon::after { border-color: rgba(52, 211, 153, 0.3); }
+        .rag-flow .step-label { color: var(--accent-rag); }
+
+        /* Fine-tune-specific colors */
+        .ft-flow .step-icon { background: rgba(244, 114, 182, 0.12); border: 1px solid rgba(244, 114, 182, 0.2); }
+        .ft-flow .step-icon::after { border-color: rgba(244, 114, 182, 0.3); }
+        .ft-flow .step-label { color: var(--accent-finetune); }
+
+        /* Eval-specific colors */
+        .eval-flow .step-icon { background: rgba(167, 139, 250, 0.12); border: 1px solid rgba(167, 139, 250, 0.2); }
+        .eval-flow .step-icon::after { border-color: rgba(167, 139, 250, 0.3); }
+        .eval-flow .step-label { color: var(--accent-eval); }
+
+        /* ============================================================
+           DATA LAYER — Files & Sources
+           ============================================================ */
+        .data-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .data-group {
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: 14px;
+            padding: 1.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .data-group:hover {
+            background: var(--bg-card-hover);
+        }
+
+        .data-group-title {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: 1rem;
+            margin-bottom: 0.3rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .data-group-desc {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+        }
+
+        .file-list {
+            list-style: none;
+        }
+
+        .file-list li {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            padding: 0.35rem 0.6rem;
+            margin-bottom: 0.3rem;
+            background: rgba(0,0,0,0.25);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: background 0.2s;
+        }
+
+        .file-list li:hover {
+            background: rgba(0,0,0,0.4);
+        }
+
+        .file-icon {
+            opacity: 0.5;
+            font-size: 0.7rem;
+        }
+
+        /* ============================================================
+           PROJECT STRUCTURE — File tree
+           ============================================================ */
+        .file-tree {
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: 14px;
+            padding: 1.5rem 2rem;
+            font-family: var(--font-mono);
+            font-size: 0.78rem;
+            line-height: 1.9;
+            color: var(--text-secondary);
+            overflow-x: auto;
+        }
+
+        .file-tree .dir {
+            color: var(--accent-base);
+            font-weight: 600;
+        }
+
+        .file-tree .file {
+            color: var(--text-secondary);
+        }
+
+        .file-tree .comment {
+            color: var(--text-muted);
+            font-size: 0.68rem;
+        }
+
+        /* ============================================================
+           COMPARISON TABLE — 3 approaches side-by-side
+           ============================================================ */
+        .compare-table-wrapper {
+            overflow-x: auto;
+            border-radius: 14px;
+            border: 1px solid var(--border-subtle);
+        }
+
+        .compare-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--bg-card);
+            font-size: 0.85rem;
+        }
+
+        .compare-table th {
+            font-family: var(--font-display);
+            font-weight: 700;
+            padding: 1rem 1.25rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border-subtle);
+            white-space: nowrap;
+        }
+
+        .compare-table td {
+            padding: 0.85rem 1.25rem;
+            border-bottom: 1px solid var(--border-subtle);
+            color: var(--text-secondary);
+            vertical-align: top;
+        }
+
+        .compare-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .compare-table tr:hover td {
+            background: rgba(255,255,255,0.02);
+        }
+
+        .compare-table .col-base th { color: var(--accent-base); }
+        .compare-table .col-rag th { color: var(--accent-rag); }
+        .compare-table .col-ft th { color: var(--accent-finetune); }
+        .compare-table .col-combined th { color: var(--accent-eval); }
+
+        /* ============================================================
+           INTERACTIVE TAB SWITCHER
+           ============================================================ */
+        .tab-bar {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .tab-btn {
+            font-family: var(--font-display);
+            font-weight: 600;
+            font-size: 0.85rem;
+            padding: 0.5rem 1.25rem;
+            border-radius: 8px;
+            border: 1px solid var(--border-subtle);
+            background: var(--bg-card);
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .tab-btn:hover {
+            background: var(--bg-card-hover);
+            color: var(--text-primary);
+        }
+
+        .tab-btn.active {
+            border-color: var(--accent-base);
+            color: var(--accent-base);
+            background: rgba(96, 165, 250, 0.08);
+        }
+
+        .tab-btn.active[data-tab="rag"] {
+            border-color: var(--accent-rag);
+            color: var(--accent-rag);
+            background: rgba(52, 211, 153, 0.08);
+        }
+
+        .tab-btn.active[data-tab="finetune"] {
+            border-color: var(--accent-finetune);
+            color: var(--accent-finetune);
+            background: rgba(244, 114, 182, 0.08);
+        }
+
+        .tab-btn.active[data-tab="eval"] {
+            border-color: var(--accent-eval);
+            color: var(--accent-eval);
+            background: rgba(167, 139, 250, 0.08);
+        }
+
+        .tab-panel {
+            display: none;
+        }
+
+        .tab-panel.active {
+            display: block;
+            animation: fadeIn 0.4s ease;
+        }
+
+        /* ============================================================
+           LEGEND / KEY
+           ============================================================ */
+        .legend {
+            display: flex;
+            gap: 1.5rem;
+            flex-wrap: wrap;
+            padding: 1rem 1.5rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            margin-bottom: 2rem;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .legend-swatch {
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+        }
+
+        /* ============================================================
+           BACK TO TOP LINK
+           ============================================================ */
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            color: var(--accent-base);
+            text-decoration: none;
+            margin-top: 2rem;
+            transition: opacity 0.2s;
+        }
+
+        .back-link:hover {
+            opacity: 0.7;
+        }
+
+        /* ============================================================
+           NAVIGATION BAR
+           ============================================================ */
+        .nav-bar {
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            background: rgba(10, 14, 26, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-subtle);
+            padding: 0 24px;
+        }
+
+        .nav-inner {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 52px;
+        }
+
+        .nav-brand {
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            color: var(--accent-base);
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            opacity: 0.8;
+            text-decoration: none;
+            transition: opacity 0.2s ease;
+        }
+
+        .nav-brand:hover { opacity: 1; }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .nav-link {
+            font-family: var(--font-display);
+            font-size: 0.85rem;
+            font-weight: 400;
+            color: var(--text-secondary);
+            text-decoration: none;
+            padding: 6px 14px;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+            letter-spacing: 0.2px;
+        }
+
+        .nav-link:hover {
+            color: var(--text-primary);
+            background: rgba(148, 163, 184, 0.08);
+        }
+
+        .nav-link.active {
+            color: var(--accent-base);
+            background: rgba(96, 165, 250, 0.08);
+        }
+
+        .nav-sep {
+            width: 3px;
+            height: 3px;
+            border-radius: 50%;
+            background: var(--text-muted);
+            opacity: 0.4;
+            margin: 0 4px;
+        }
+
+        /* ============================================================
+           ANIMATIONS
+           ============================================================ */
+        @keyframes fadeInDown {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes fadeInLeft {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes pulse-border {
+            0%, 100% { opacity: 0; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.05); }
+        }
+
+        /* Data flow animation on arrows */
+        @keyframes dataflow {
+            0% { stroke-dashoffset: 20; }
+            100% { stroke-dashoffset: 0; }
+        }
+
+        .flow-arrow svg line,
+        .step-arrow svg line,
+        .module-arrow svg line {
+            stroke-dasharray: 4 4;
+            animation: dataflow 1s linear infinite;
+        }
+
+        /* ============================================================
+           RESPONSIVE — Stack on smaller screens
+           ============================================================ */
+        @media (max-width: 768px) {
+            .nav-inner {
+                height: auto;
+                min-height: 52px;
+                flex-wrap: wrap;
+                padding: 8px 0;
+                gap: 8px;
+            }
+            .nav-brand { font-size: 0.7rem; }
+            .nav-links {
+                width: 100%;
+                justify-content: center;
+                flex-wrap: wrap;
+                gap: 2px;
+            }
+            .nav-link { font-size: 0.72rem; padding: 5px 8px; }
+            .nav-sep { display: none; }
+
+            .page-wrapper { padding: 1rem 1rem 4rem; }
+
+            /* High-level pipeline stacks vertically on mobile */
+            .flow-pipeline { flex-direction: column; align-items: center; }
+            .flow-arrow { transform: rotate(90deg); min-width: auto; min-height: 40px; }
+
+            /* Detailed step flows stack vertically on mobile */
+            .step-flow { flex-direction: column; align-items: center; }
+            .step-arrow { transform: rotate(90deg); min-width: auto; min-height: 30px; }
+
+            /* Module timeline: switch from horizontal to vertical stack */
+            .module-timeline {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 0;
+                padding-left: 2.5rem;    /* room for the dots on the left */
+            }
+
+            /* Connecting line rotates to vertical on mobile */
+            .module-timeline::before {
+                top: 0;
+                bottom: 0;
+                left: 12px;
+                right: auto;
+                width: 2px;
+                height: auto;
+                background: linear-gradient(180deg,
+                    var(--accent-base) 0%,
+                    var(--accent-rag) 33%,
+                    var(--accent-finetune) 66%,
+                    var(--accent-eval) 100%
+                );
+            }
+
+            /* Dots move to the left edge like a vertical timeline */
+            .module-item {
+                align-items: flex-start;
+                flex-direction: row;
+                gap: 0.75rem;
+                margin-bottom: 1.5rem;
+            }
+
+            .module-dot {
+                position: absolute;
+                left: -2.5rem;
+                top: 0.5rem;
+                margin-bottom: 0;
+                width: 26px;
+                height: 26px;
+                font-size: 0.65rem;
+            }
+
+            .module-card {
+                width: 100%;
+            }
+
+            /* Hide horizontal arrows on mobile */
+            .module-arrow { display: none; }
+
+            .header-meta { flex-direction: column; align-items: center; gap: 0.5rem; }
+        }
+        @media (max-width: 480px) {
+            .nav-bar { padding: 0 12px; }
+            .nav-link { font-size: 0.68rem; padding: 4px 6px; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Navigation Bar -->
+<nav class="nav-bar">
+    <div class="nav-inner">
+        <a href="/" class="nav-brand">⚡ AI Concepts</a>
+        <div class="nav-links">
+            <a href="/" class="nav-link">Neural Networks</a>
+            <div class="nav-sep"></div>
+            <a href="/rag/how-rag-works" class="nav-link">RAG Pipeline</a>
+            <div class="nav-sep"></div>
+            <a href="/transformers/how-transformers-work" class="nav-link">Transformers</a>
+            <div class="nav-sep"></div>
+            <a href="/agentic-ai/how-agents-work" class="nav-link">Agentic AI</a>
+            <div class="nav-sep"></div>
+            <a href="/training/how-training-works" class="nav-link">Training Pipeline</a>
+            <div class="nav-sep"></div>
+            <a href="/ai-security/securing-ai" class="nav-link">AI Security</a>
+            <div class="nav-sep"></div>
+            <a href="/lab/lab-architecture" class="nav-link active">Lab Architecture</a>
+        </div>
+    </div>
+</nav>
+
+<div class="page-wrapper">
+
+    <!-- ============================================================
+         PAGE HEADER
+         ============================================================ -->
+    <header class="page-header">
+        <div class="breadcrumb">
+            <a href="/">AI Concepts</a> / Lab Architecture
+        </div>
+        <h1>LLM Fine-Tuning & RAG Lab</h1>
+        <p class="subtitle">
+            A complete architecture map of the hands-on training lab — from base model to domain expert.
+            Use this as your reference guide while working through each module.
+        </p>
+        <div class="header-meta">
+            <span><span class="meta-dot" style="background:var(--accent-colab)"></span> Google Colab (T4 GPU)</span>
+            <span><span class="meta-dot" style="background:var(--accent-base)"></span> TinyLlama-1.1B-Chat</span>
+            <span><span class="meta-dot" style="background:var(--accent-rag)"></span> LangChain + ChromaDB</span>
+            <span><span class="meta-dot" style="background:var(--accent-finetune)"></span> Unsloth + QLoRA</span>
+            <span>⏱ ~2.5 hours total</span>
+        </div>
+    </header>
+
+    <!-- ============================================================
+         SECTION 1: HIGH-LEVEL ARCHITECTURE OVERVIEW
+         Shows the big picture: what goes in, what comes out
+         ============================================================ -->
+    <section class="diagram-section" id="overview">
+        <h2 class="section-title">
+            <span class="section-number" style="background:rgba(96,165,250,0.15); color:var(--accent-base);">01</span>
+            High-Level Architecture
+        </h2>
+        <p class="section-desc">
+            The lab transforms a general-purpose LLM into an F5 domain expert using two complementary techniques:
+            Retrieval-Augmented Generation (RAG) and QLoRA fine-tuning. Here's how all the pieces connect.
+        </p>
+
+        <!-- Big horizontal pipeline -->
+        <div class="flow-pipeline">
+            <div class="flow-stage">
+                <div class="flow-card" style="border-color: rgba(249,171,0,0.2);">
+                    <div class="icon">🖥️</div>
+                    <div class="label" style="color:var(--accent-colab);">Google Colab</div>
+                    <div class="detail">Free T4 GPU<br>Runtime environment</div>
+                </div>
+            </div>
+
+            <div class="flow-arrow">
+                <svg viewBox="0 0 40 20"><line x1="0" y1="10" x2="36" y2="10" stroke="currentColor" stroke-width="1.5"/><polygon points="36,6 40,10 36,14" fill="currentColor"/></svg>
+            </div>
+
+            <div class="flow-stage">
+                <div class="flow-card" style="border-color: rgba(96,165,250,0.2);">
+                    <div class="icon">🧠</div>
+                    <div class="label" style="color:var(--accent-base);">TinyLlama-1.1B</div>
+                    <div class="detail">4-bit quantized<br>Base model (~2GB)</div>
+                </div>
+            </div>
+
+            <div class="flow-arrow">
+                <svg viewBox="0 0 40 20"><line x1="0" y1="10" x2="36" y2="10" stroke="currentColor" stroke-width="1.5"/><polygon points="36,6 40,10 36,14" fill="currentColor"/></svg>
+            </div>
+
+            <div class="flow-stage">
+                <div class="flow-card" style="border-color: rgba(52,211,153,0.2);">
+                    <div class="icon">🔍</div>
+                    <div class="label" style="color:var(--accent-rag);">+ RAG</div>
+                    <div class="detail">LangChain + ChromaDB<br>External knowledge</div>
+                </div>
+            </div>
+
+            <div class="flow-arrow">
+                <svg viewBox="0 0 40 20"><line x1="0" y1="10" x2="36" y2="10" stroke="currentColor" stroke-width="1.5"/><polygon points="36,6 40,10 36,14" fill="currentColor"/></svg>
+            </div>
+
+            <div class="flow-stage">
+                <div class="flow-card" style="border-color: rgba(244,114,182,0.2);">
+                    <div class="icon">⚡</div>
+                    <div class="label" style="color:var(--accent-finetune);">+ Fine-Tuning</div>
+                    <div class="detail">QLoRA + Unsloth<br>Domain specialization</div>
+                </div>
+            </div>
+
+            <div class="flow-arrow">
+                <svg viewBox="0 0 40 20"><line x1="0" y1="10" x2="36" y2="10" stroke="currentColor" stroke-width="1.5"/><polygon points="36,6 40,10 36,14" fill="currentColor"/></svg>
+            </div>
+
+            <div class="flow-stage">
+                <div class="flow-card" style="border-color: rgba(167,139,250,0.2);">
+                    <div class="icon">🏆</div>
+                    <div class="label" style="color:var(--accent-eval);">F5 AI Expert</div>
+                    <div class="detail">Domain-specific<br>Compare & evaluate</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================================================
+         SECTION 2: TECH STACK
+         ============================================================ -->
+    <section class="diagram-section" id="tech-stack">
+        <h2 class="section-title">
+            <span class="section-number" style="background:rgba(249,171,0,0.15); color:var(--accent-colab);">02</span>
+            Tech Stack
+        </h2>
+        <p class="section-desc">
+            Every tool in the lab was chosen to run on free-tier hardware. No API keys, no paid services —
+            everything works on a Google Colab T4 GPU with ~15GB of RAM.
+        </p>
+
+        <div class="tech-grid">
+            <div class="tech-card" data-color="colab">
+                <div class="tech-role">Environment</div>
+                <div class="tech-name">Google Colab</div>
+                <div class="tech-why">Free T4 GPU with 15GB VRAM. No local setup needed — just a Google account and a browser.</div>
+            </div>
+            <div class="tech-card" data-color="blue">
+                <div class="tech-role">Base Model</div>
+                <div class="tech-name">TinyLlama-1.1B-Chat</div>
+                <div class="tech-why">Only 1.1 billion parameters (~2GB quantized). Small enough for free-tier Colab, big enough to demonstrate real LLM behavior.</div>
+            </div>
+            <div class="tech-card" data-color="green">
+                <div class="tech-role">RAG Framework</div>
+                <div class="tech-name">LangChain</div>
+                <div class="tech-why">Industry-standard framework for building RAG pipelines. Handles document loading, chunking, and retrieval chains.</div>
+            </div>
+            <div class="tech-card" data-color="green">
+                <div class="tech-role">Vector Database</div>
+                <div class="tech-name">ChromaDB</div>
+                <div class="tech-why">Runs locally with zero configuration. No API keys or external services needed — stores vectors right in the notebook.</div>
+            </div>
+            <div class="tech-card" data-color="orange">
+                <div class="tech-role">Embeddings</div>
+                <div class="tech-name">all-MiniLM-L6-v2</div>
+                <div class="tech-why">A sentence-transformer model that converts text into numerical vectors. Free, fast, and runs on CPU.</div>
+            </div>
+            <div class="tech-card" data-color="pink">
+                <div class="tech-role">Fine-Tuning</div>
+                <div class="tech-name">Unsloth + QLoRA + PEFT</div>
+                <div class="tech-why">Unsloth makes training 2× faster. QLoRA quantizes to 4-bit. PEFT only trains a tiny fraction of parameters — all to fit in 6GB VRAM.</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================================================
+         SECTION 3: MODULE TIMELINE
+         ============================================================ -->
+    <section class="diagram-section" id="modules">
+        <h2 class="section-title">
+            <span class="section-number" style="background:rgba(52,211,153,0.15); color:var(--accent-rag);">03</span>
+            Lab Modules
+        </h2>
+        <p class="section-desc">
+            The lab is split into four sequential notebooks. Each module builds on the previous one.
+            Work through them in order — the results from earlier modules feed into later ones.
+        </p>
+
+        <div class="module-timeline">
+            <!-- Module 1 -->
+            <div class="module-item" data-module="1">
+                <div class="module-dot">01</div>
+                <div class="module-card">
+                    <div class="module-header">
+                        <span class="module-name">Setup & Base Model</span>
+                        <span class="module-time">~20 min</span>
+                    </div>
+                    <p class="module-desc">
+                        Install dependencies, enable GPU, load the quantized TinyLlama model, and run baseline
+                        questions to see how a general-purpose model handles F5-specific topics (spoiler: not great).
+                    </p>
+                    <span class="module-notebook">📓 01_Setup_and_Base_Model.ipynb</span>
+                </div>
+            </div>
+
+            <!-- Arrow 1→2 -->
+            <div class="module-arrow">
+                <svg viewBox="0 0 32 16"><line x1="0" y1="8" x2="28" y2="8" stroke="currentColor" stroke-width="1.5"/><polygon points="28,4 32,8 28,12" fill="currentColor"/></svg>
+            </div>
+
+            <!-- Module 2 -->
+            <div class="module-item" data-module="2">
+                <div class="module-dot">02</div>
+                <div class="module-card">
+                    <div class="module-header">
+                        <span class="module-name">RAG System</span>
+                        <span class="module-time">~45 min</span>
+                    </div>
+                    <p class="module-desc">
+                        Build a retrieval-augmented generation pipeline. Load F5 docs, chunk them, create
+                        vector embeddings with MiniLM, store in ChromaDB, and wire it together with LangChain.
+                    </p>
+                    <span class="module-notebook">📓 02_RAG_System.ipynb</span>
+                </div>
+            </div>
+
+            <!-- Arrow 2→3 -->
+            <div class="module-arrow">
+                <svg viewBox="0 0 32 16"><line x1="0" y1="8" x2="28" y2="8" stroke="currentColor" stroke-width="1.5"/><polygon points="28,4 32,8 28,12" fill="currentColor"/></svg>
+            </div>
+
+            <!-- Module 3 -->
+            <div class="module-item" data-module="3">
+                <div class="module-dot">03</div>
+                <div class="module-card">
+                    <div class="module-header">
+                        <span class="module-name">Fine-Tuning with QLoRA</span>
+                        <span class="module-time">~60 min</span>
+                    </div>
+                    <p class="module-desc">
+                        Train the model on 150+ F5 Q&A pairs using QLoRA. Unsloth optimizes speed,
+                        PEFT keeps memory low by only modifying a tiny fraction of the model's weights.
+                    </p>
+                    <span class="module-notebook">📓 03_FineTuning_QLoRA.ipynb</span>
+                </div>
+            </div>
+
+            <!-- Arrow 3→4 -->
+            <div class="module-arrow">
+                <svg viewBox="0 0 32 16"><line x1="0" y1="8" x2="28" y2="8" stroke="currentColor" stroke-width="1.5"/><polygon points="28,4 32,8 28,12" fill="currentColor"/></svg>
+            </div>
+
+            <!-- Module 4 -->
+            <div class="module-item" data-module="4">
+                <div class="module-dot">04</div>
+                <div class="module-card">
+                    <div class="module-header">
+                        <span class="module-name">Comparison & Evaluation</span>
+                        <span class="module-time">~25 min</span>
+                    </div>
+                    <p class="module-desc">
+                        Run the same F5 questions across all three approaches (base, RAG, fine-tuned) and compare
+                        results side-by-side. Visualize quality improvements.
+                    </p>
+                    <span class="module-notebook">📓 04_Comparison_Evaluation.ipynb</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================================================
+         SECTION 4: DETAILED FLOW DIAGRAMS
+         Users can tab between RAG, Fine-Tuning, and Evaluation flows
+         ============================================================ -->
+    <section class="diagram-section" id="flows">
+        <h2 class="section-title">
+            <span class="section-number" style="background:rgba(244,114,182,0.15); color:var(--accent-finetune);">04</span>
+            Detailed Flow Diagrams
+        </h2>
+        <p class="section-desc">
+            Click each tab to explore the step-by-step data flow for each technique.
+            These diagrams show exactly what happens at each stage inside the notebooks.
+        </p>
+
+        <!-- Tab buttons -->
+        <div class="tab-bar">
+            <button class="tab-btn active" data-tab="rag" onclick="switchTab('rag')">🔍 RAG Pipeline</button>
+            <button class="tab-btn" data-tab="finetune" onclick="switchTab('finetune')">⚡ Fine-Tuning</button>
+            <button class="tab-btn" data-tab="eval" onclick="switchTab('eval')">📊 Evaluation</button>
+        </div>
+
+        <!-- TAB 1: RAG Pipeline -->
+        <div class="tab-panel active" id="tab-rag">
+            <div class="detail-flow rag-flow">
+                <div class="flow-title" style="color:var(--accent-rag);">RAG Pipeline Flow</div>
+                <div class="flow-subtitle">How the model retrieves and uses external F5 documentation to answer questions</div>
+
+                <!-- Ingestion Phase -->
+                <p style="font-family:var(--font-mono); font-size:0.7rem; color:var(--accent-rag); margin-bottom:0.75rem; letter-spacing:0.08em;">
+                    INGESTION PHASE — Loading docs into the vector store
+                </p>
+                <div class="step-flow" style="margin-bottom:2rem;">
+                    <div class="step-box">
+                        <div class="step-icon">📄</div>
+                        <div class="step-label">F5 Docs</div>
+                        <div class="step-detail">6 text files<br>BIG-IP, iRules,<br>SSL, monitors…</div>
+                    </div>
+                    <div class="step-arrow"><svg viewBox="0 0 28 16"><line x1="0" y1="8" x2="24" y2="8" stroke="currentColor" stroke-width="1.5"/><polygon points="24,4 28,8 24,12" fill="currentColor"/></svg></div>
+                    <div class="step-box">
+                        <div class="step-icon">✂️</div>
+                        <div class="step-label">Chunking</div>
+                        <div class="step-detail">LangChain text<br>splitter breaks docs<br>into small pieces</div>
+                    </div>
+                    <div class="step-arrow"><svg viewBox="0 0 28 16"><line x1="0" y1="8" x2="24" y2="8" stroke="currentColor" stroke-width="1.5"/><polygon points="24,4 28,8 24,12" fill="currentColor"/></svg></div>
+                    <div class="step-box">
+                        <div class="step-icon">🔢</div>
+                        <div class="step-label">Embeddings</div>
+                        <div class="step-detail">all-MiniLM-L6-v2<br>converts chunks<br>to vectors</div>
+                    </div>
+                    <div class="step-arrow"><svg viewBox="0 0 28 16"><line x1="0" y1="8" x2="24" y2="8" stroke="currentColor" stroke-width="1.5"/><polygon points="24,4 28,8 24,12" fill="currentColor"/></svg></div>
+                    <div class="step-box">
+                        <div class="step-icon">🗄️</div>
+                        <div class="step-label">ChromaDB</div>
+                        <div class="step-detail">Vectors stored<br>in local vector<br>database</div>
+                    </div>
+                </div>
+
+                <!-- Query Phase -->
+                <p style="font-family:var(--font-mono); font-size:0.7rem; color:var(--accent-rag); margin-bottom:0.75rem; letter-spacing:0.08em;">
+                    QUERY PHASE — Answering questions with retrieved context
+                </p>
+                <div class="step-flow">
+                    <div class="step-box">
+                        <div class="step-icon">❓</div>
+                        <div class="step-label">User Question</div>
+                        <div class="step-detail">"How do I<br>configure an<br>F5 health monitor?"</div>
+                    </div>
+                    <div class="step-arrow"><svg viewBox="0 0 28 16"><line x1="0" y1="8" x2="24" y2="8" stroke="currentColor" stroke-width="1.5"/><polygon points="24,4 28,8 24,12" fill="currentColor"/></svg></div>
+                    <div class="step-box">
+                        <div class="step-icon">🔎</div>
+                        <div class="step-label">Similarity Search</div>
+                        <div class="step-detail">Question embedded,<br>matched against<br>stored vectors</div>
+                    </div>
+                    <div class="step-arrow"><svg viewBox="0 0 28 16"><line x1="0" y1="8" x2="24" y2="8" stroke="currentColor" stroke-width="1.5"/><polygon points="24,4 28,8 24,12" fill="currentColor"/></svg></div>
+                    <div class="step-box">
+                        <div class="step-icon">📋</div>
+                        <div class="step-label">Context Injection</div>
+                        <div class="step-detail">Top relevant<br>chunks added<br>to the prompt</div>
+                    </div>
+                    <div class="step-arrow"><svg viewBox="0 0 28 16"><line x1="0" y1="8" x2="24" y2="8" stroke="currentColor" stroke-width="1.5"/><polygon points="24,4 28,8 24,12" fill="currentColor"/></svg></div>
+                    <div class="step-box">
+                        <div class="step-icon">🧠</div>
+                        <div class="step-label">LLM Generation</div>
+                        <div class="step-detail">TinyLlama answers<br>using the retrieved<br>F5 documentation</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: Fine-Tuning -->
+        <div class="tab-panel" id="tab-finetune">
+            <div class="detail-flow ft-flow">
+                <div class="flow-title" style="color:var(--accent-finetune);">Fine-Tuning Flow</div>
+                <div class="flow-subtitle">How the model's weights are updated to specialize in F5 knowledge</div>
+
+                <p style="font-family:var(--font-mono); font-size:0.7rem; color:var(--accent-finetune); margin-bottom:0.75rem; letter-spacing:0.08em;">
+                    PREPARATION — Getting data and model ready
+                </p>
+                <div class="step-flow" style="margin-bottom:2rem;">
+                    <div class="step-box">
+                        <div class="step-icon">📝</div>
+                        <div class="step-label">Training Data</div>
+                        <div class="step-detail">150+ F5 Q&A pairs<br>in JSONL format<br>f5_qa_train.jsonl</div>
+                    </div>
+                    <div class="step-arrow"><svg viewBox="0 0 28 16"><line x1="0" y1="8" x2="24" y2="8" stroke="currentColor" stroke-width="1.5"/><polygon points="24,4 28,8 24,12" fill="currentColor"/></svg></div>
+                    <div class="step-box">
+                        <div class="step-icon">🔄</div>
+                        <div class="step-label">Format as Chat</div>
+                        <div class="step-detail">Convert Q&A into<br>chat-style prompts<br>for TinyLlama</div>
+                    </div>
+                    <div class="step-arrow"><svg viewBox="0 0 28 16"><line x1="0" y1="8" x2="24" y2="8" stroke="currentColor" stroke-width="1.5"/><polygon points="24,4 28,8 24,12" fill="currentColor"/></svg></div>
+                    <div class="step-box">
+                        <div class="step-icon">📐</div>
+                        <div class="step-label">QLoRA Setup</div>
+                        <div class="step-detail">4-bit quantization<br>+ low-rank adapters<br>attached to model</div>
+                    </div>
+                </div>
+
+                <p style="font-family:var(--font-mono); font-size:0.7rem; color:var(--accent-finetune); margin-bottom:0.75rem; letter-spacing:0.08em;">
+                    TRAINING — Updating the model with domain knowledge
+                </p>
+                <div class="step-flow">
+                    <div class="step-box">
+                        <div class="step-icon">🚀</div>
+                        <div class="step-label">Unsloth Trainer</div>
+                        <div class="step-detail">2× faster training<br>optimized kernels<br>for T4 GPU</div>
+                    </div>
+                    <div class="step-arrow"><svg viewBox="0 0 28 16"><line x1="0" y1="8" x2="24" y2="8" stroke="currentColor" stroke-width="1.5"/><polygon points="24,4 28,8 24,12" fill="currentColor"/></svg></div>
+                    <div class="step-box">
+                        <div class="step-icon">📉</div>
+                        <div class="step-label">Training Loop</div>
+                        <div class="step-detail">Loss decreases<br>as model learns<br>F5 patterns</div>
+                    </div>
+                    <div class="step-arrow"><svg viewBox="0 0 28 16"><line x1="0" y1="8" x2="24" y2="8" stroke="currentColor" stroke-width="1.5"/><polygon points="24,4 28,8 24,12" fill="currentColor"/></svg></div>
+                    <div class="step-box">
+                        <div class="step-icon">🔗</div>
+                        <div class="step-label">PEFT Adapters</div>
+                        <div class="step-detail">Only ~1% of weights<br>modified — tiny<br>adapter layers saved</div>
+                    </div>
+                    <div class="step-arrow"><svg viewBox="0 0 28 16"><line x1="0" y1="8" x2="24" y2="8" stroke="currentColor" stroke-width="1.5"/><polygon points="24,4 28,8 24,12" fill="currentColor"/></svg></div>
+                    <div class="step-box">
+                        <div class="step-icon">✅</div>
+                        <div class="step-label">F5 Expert Model</div>
+                        <div class="step-detail">Merged model<br>with built-in<br>F5 knowledge</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 3: Evaluation -->
+        <div class="tab-panel" id="tab-eval">
+            <div class="detail-flow eval-flow">
+                <div class="flow-title" style="color:var(--accent-eval);">Evaluation & Comparison Flow</div>
+                <div class="flow-subtitle">How the three approaches are compared side-by-side</div>
+
+                <div class="step-flow" style="margin-bottom:2rem;">
+                    <div class="step-box">
+                        <div class="step-icon">📋</div>
+                        <div class="step-label">Test Questions</div>
+                        <div class="step-detail">30+ evaluation<br>Q&A pairs from<br>f5_qa_eval.jsonl</div>
+                    </div>
+                    <div class="step-arrow"><svg viewBox="0 0 28 16"><line x1="0" y1="8" x2="24" y2="8" stroke="currentColor" stroke-width="1.5"/><polygon points="24,4 28,8 24,12" fill="currentColor"/></svg></div>
+                    <div class="step-box">
+                        <div class="step-icon">🔀</div>
+                        <div class="step-label">3-Way Test</div>
+                        <div class="step-detail">Same question sent<br>to Base, RAG, and<br>Fine-tuned models</div>
+                    </div>
+                    <div class="step-arrow"><svg viewBox="0 0 28 16"><line x1="0" y1="8" x2="24" y2="8" stroke="currentColor" stroke-width="1.5"/><polygon points="24,4 28,8 24,12" fill="currentColor"/></svg></div>
+                    <div class="step-box">
+                        <div class="step-icon">📊</div>
+                        <div class="step-label">Score & Compare</div>
+                        <div class="step-detail">Measure accuracy,<br>relevance, and<br>completeness</div>
+                    </div>
+                    <div class="step-arrow"><svg viewBox="0 0 28 16"><line x1="0" y1="8" x2="24" y2="8" stroke="currentColor" stroke-width="1.5"/><polygon points="24,4 28,8 24,12" fill="currentColor"/></svg></div>
+                    <div class="step-box">
+                        <div class="step-icon">📈</div>
+                        <div class="step-label">Visualize Results</div>
+                        <div class="step-detail">Charts showing<br>improvement across<br>all approaches</div>
+                    </div>
+                </div>
+
+                <!-- Comparison table -->
+                <div class="compare-table-wrapper" style="margin-top:1.5rem;">
+                    <table class="compare-table">
+                        <thead>
+                            <tr>
+                                <th style="min-width:140px;">Approach</th>
+                                <th>What it Does</th>
+                                <th>Strengths</th>
+                                <th>Limitations</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td style="color:var(--accent-base); font-weight:600;">🧠 Base Model</td>
+                                <td>Uses only TinyLlama's pre-trained knowledge — no F5 data at all</td>
+                                <td>Fast, simple, no extra setup</td>
+                                <td>Hallucinates F5 answers, lacks domain knowledge</td>
+                            </tr>
+                            <tr>
+                                <td style="color:var(--accent-rag); font-weight:600;">🔍 RAG</td>
+                                <td>Retrieves relevant F5 docs and includes them in the prompt</td>
+                                <td>Grounded in real docs, no training needed, updatable</td>
+                                <td>Depends on retrieval quality, slower inference</td>
+                            </tr>
+                            <tr>
+                                <td style="color:var(--accent-finetune); font-weight:600;">⚡ Fine-Tuned</td>
+                                <td>Model weights updated with F5 Q&A training data</td>
+                                <td>Built-in F5 knowledge, fast at inference time</td>
+                                <td>Requires training data, can't easily update, may overfit</td>
+                            </tr>
+                            <tr>
+                                <td style="color:var(--accent-eval); font-weight:600;">🏆 FT + RAG</td>
+                                <td>Fine-tuned model combined with RAG retrieval</td>
+                                <td>Best of both — domain knowledge plus real-time docs</td>
+                                <td>Most complex to build and maintain</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================================================
+         SECTION 5: DATA LAYER
+         ============================================================ -->
+    <section class="diagram-section" id="data">
+        <h2 class="section-title">
+            <span class="section-number" style="background:rgba(251,146,60,0.15); color:var(--accent-data);">05</span>
+            Data Layer
+        </h2>
+        <p class="section-desc">
+            The lab uses two types of data: documentation files for RAG retrieval, and structured Q&A pairs for fine-tuning.
+        </p>
+
+        <div class="data-grid">
+            <!-- RAG Knowledge Base -->
+            <div class="data-group">
+                <div class="data-group-title" style="color:var(--accent-rag);">📚 RAG Knowledge Base</div>
+                <div class="data-group-desc">Curated F5 technical documentation used as the retrieval source. Chunked and embedded into ChromaDB.</div>
+                <ul class="file-list">
+                    <li><span class="file-icon">📄</span> bigip_basics.txt — BIG-IP architecture & components</li>
+                    <li><span class="file-icon">📄</span> irules_guide.txt — iRules scripting reference</li>
+                    <li><span class="file-icon">📄</span> load_balancing.txt — LB algorithms & configuration</li>
+                    <li><span class="file-icon">📄</span> ssl_offloading.txt — SSL/TLS offloading setup</li>
+                    <li><span class="file-icon">📄</span> health_monitors.txt — Health monitor configuration</li>
+                    <li><span class="file-icon">📄</span> troubleshooting.txt — Common troubleshooting procedures</li>
+                </ul>
+            </div>
+
+            <!-- Training Data -->
+            <div class="data-group">
+                <div class="data-group-title" style="color:var(--accent-finetune);">🏋️ Training Data</div>
+                <div class="data-group-desc">Structured question-answer pairs in JSONL format. Used to fine-tune the model with QLoRA.</div>
+                <ul class="file-list">
+                    <li><span class="file-icon">📊</span> f5_qa_train.jsonl — 150+ Q&A pairs for training</li>
+                    <li><span class="file-icon">📊</span> f5_qa_eval.jsonl — 30+ Q&A pairs for evaluation</li>
+                </ul>
+            </div>
+
+            <!-- Source Utilities -->
+            <div class="data-group">
+                <div class="data-group-title" style="color:var(--accent-base);">🛠️ Source Utilities</div>
+                <div class="data-group-desc">Python helper modules that power the notebooks. Located in the <code style="color:var(--accent-base);">src/</code> directory.</div>
+                <ul class="file-list">
+                    <li><span class="file-icon">🐍</span> config.py — Central configuration settings</li>
+                    <li><span class="file-icon">🐍</span> data_loader.py — Data loading utilities</li>
+                    <li><span class="file-icon">🐍</span> rag_utils.py — RAG helper functions</li>
+                    <li><span class="file-icon">🐍</span> training_utils.py — Fine-tuning utilities</li>
+                    <li><span class="file-icon">🐍</span> evaluation.py — Scoring & evaluation metrics</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================================================
+         SECTION 6: PROJECT STRUCTURE
+         ============================================================ -->
+    <section class="diagram-section" id="structure">
+        <h2 class="section-title">
+            <span class="section-number" style="background:rgba(167,139,250,0.15); color:var(--accent-eval);">06</span>
+            Project Structure
+        </h2>
+        <p class="section-desc">
+            A map of every file and folder in the repo. The notebooks are your main entry point —
+            everything else supports them.
+        </p>
+
+        <div class="file-tree">
+<span class="dir">llm-finetuning-rag-lab/</span>
+├── <span class="file">README.md</span>                       <span class="comment">← Start here</span>
+├── <span class="file">requirements.txt</span>                <span class="comment">← Python dependencies</span>
+├── <span class="dir">notebooks/</span>                       <span class="comment">← 🎯 Your main workspace</span>
+│   ├── <span class="file">01_Setup_and_Base_Model.ipynb</span>    <span class="comment">← Module 1</span>
+│   ├── <span class="file">02_RAG_System.ipynb</span>             <span class="comment">← Module 2</span>
+│   ├── <span class="file">03_FineTuning_QLoRA.ipynb</span>       <span class="comment">← Module 3</span>
+│   └── <span class="file">04_Comparison_Evaluation.ipynb</span>  <span class="comment">← Module 4</span>
+├── <span class="dir">data/</span>
+│   ├── <span class="dir">f5_docs/</span>                     <span class="comment">← RAG knowledge base (6 text files)</span>
+│   └── <span class="dir">training/</span>                    <span class="comment">← Fine-tuning data (JSONL files)</span>
+├── <span class="dir">src/</span>                             <span class="comment">← Python helper modules</span>
+│   ├── <span class="file">config.py</span>
+│   ├── <span class="file">data_loader.py</span>
+│   ├── <span class="file">rag_utils.py</span>
+│   ├── <span class="file">training_utils.py</span>
+│   └── <span class="file">evaluation.py</span>
+├── <span class="dir">results/</span>                         <span class="comment">← Saved outputs & comparisons</span>
+├── <span class="dir">docs/</span>
+│   ├── <span class="file">INSTRUCTOR_GUIDE.md</span>          <span class="comment">← Teaching notes</span>
+│   └── <span class="file">TROUBLESHOOTING.md</span>           <span class="comment">← Common issues & fixes</span>
+└── <span class="dir">images/</span>                          <span class="comment">← Diagrams & screenshots</span>
+        </div>
+    </section>
+
+    <!-- ============================================================
+         COLOR LEGEND
+         ============================================================ -->
+    <div class="legend">
+        <div class="legend-item"><div class="legend-swatch" style="background:var(--accent-colab);"></div> Environment</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:var(--accent-base);"></div> Base Model</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:var(--accent-rag);"></div> RAG</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:var(--accent-finetune);"></div> Fine-Tuning</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:var(--accent-eval);"></div> Evaluation</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:var(--accent-data);"></div> Data</div>
+    </div>
+
+    <a class="back-link" href="/">← Back to AI Concepts</a>
+
+</div>
+
+<!-- ============================================================
+     JAVASCRIPT
+     - Scroll-triggered fade-in animations for each section
+     - Tab switching for the detailed flow diagrams
+     ============================================================ -->
+<script>
+    // ==========================================================
+    // SCROLL ANIMATION
+    // Uses IntersectionObserver to add a "visible" class to each
+    // diagram-section when it scrolls into view. This triggers
+    // the CSS fade-in transition defined above.
+    // ==========================================================
+    document.addEventListener('DOMContentLoaded', function() {
+
+        // Create an observer that watches for elements entering the viewport
+        const observer = new IntersectionObserver(function(entries) {
+            entries.forEach(function(entry) {
+                // When a section is at least 10% visible, add the "visible" class
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                }
+            });
+        }, {
+            // trigger when 10% of the element is visible
+            threshold: 0.1
+        });
+
+        // Observe every section with the "diagram-section" class
+        var sections = document.querySelectorAll('.diagram-section');
+        sections.forEach(function(section) {
+            observer.observe(section);
+        });
+    });
+
+    // ==========================================================
+    // TAB SWITCHING
+    // Controls the three tabs in Section 4 (RAG / Fine-Tuning /
+    // Evaluation). Clicking a tab button shows the matching panel
+    // and hides the others.
+    // ==========================================================
+    function switchTab(tabName) {
+        // 1) Remove "active" class from all tab buttons
+        var allButtons = document.querySelectorAll('.tab-btn');
+        allButtons.forEach(function(btn) {
+            btn.classList.remove('active');
+        });
+
+        // 2) Hide all tab panels
+        var allPanels = document.querySelectorAll('.tab-panel');
+        allPanels.forEach(function(panel) {
+            panel.classList.remove('active');
+        });
+
+        // 3) Activate the clicked button and matching panel
+        var activeButton = document.querySelector('.tab-btn[data-tab="' + tabName + '"]');
+        var activePanel = document.getElementById('tab-' + tabName);
+
+        if (activeButton) activeButton.classList.add('active');
+        if (activePanel) activePanel.classList.add('active');
+    }
+</script>
+
+</body>
+</html>
