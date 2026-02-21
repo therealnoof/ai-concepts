@@ -543,6 +543,8 @@
       <div class="nav-sep"></div>
       <a href="/transformers/how-transformers-work" class="nav-link">Transformers</a>
       <div class="nav-sep"></div>
+      <a href="/attention-math/how-attention-works" class="nav-link">Attention Math</a>
+      <div class="nav-sep"></div>
       <a href="/agentic-ai/how-agents-work" class="nav-link">Agentic AI</a>
       <div class="nav-sep"></div>
       <a href="/training/how-training-works" class="nav-link">Training Pipeline</a>
@@ -929,16 +931,31 @@
 
   function moveTooltip(e) {
     // Position the tooltip near the mouse cursor
-    const tooltipWidth = tooltipEl.offsetWidth || 260;
-    const viewportWidth = window.innerWidth;
-    const spaceOnRight = viewportWidth - e.clientX;
-    
-    if (spaceOnRight < tooltipWidth + 32) {
-      tooltipEl.style.left = (e.clientX - tooltipWidth - 16) + 'px';
-    } else {
-      tooltipEl.style.left = (e.clientX + 16) + 'px';
+    // Fully clamped tooltip positioning — works on all screen sizes including mobile.
+    // Tries right of cursor first, flips left if no room, then hard-clamps both edges.
+    const tooltipWidth  = tooltipEl.offsetWidth  || 260;
+    const tooltipHeight = tooltipEl.offsetHeight || 120;
+    const viewportWidth  = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const MARGIN = 12;
+
+    // Horizontal: try right of cursor, flip left if it would overflow right edge
+    let left = e.clientX + 16;
+    if (left + tooltipWidth + MARGIN > viewportWidth) {
+      left = e.clientX - tooltipWidth - 16;
     }
-    tooltipEl.style.top = (e.clientY - 10) + 'px';
+    // Hard clamp: never go off left OR right edge
+    left = Math.max(MARGIN, Math.min(left, viewportWidth - tooltipWidth - MARGIN));
+
+    // Vertical: position above cursor, clamp if it would go off bottom or top
+    let top = e.clientY - 10;
+    if (top + tooltipHeight + MARGIN > viewportHeight) {
+      top = viewportHeight - tooltipHeight - MARGIN;
+    }
+    top = Math.max(MARGIN, top);
+
+    tooltipEl.style.left = left + 'px';
+    tooltipEl.style.top  = top  + 'px';
   }
 
   function hideTooltip() {
