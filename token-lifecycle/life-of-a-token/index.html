@@ -1,0 +1,1392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Life of a Token</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;600&family=IBM+Plex+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:       #080f1a;
+    --surface:  #0d1b2e;
+    --panel:    #0f2240;
+    --border:   #1a3a5c;
+    --cyan:     #00d4ff;
+    --blue:     #3b82f6;
+    --green:    #22d3a5;
+    --orange:   #f97316;
+    --purple:   #a78bfa;
+    --yellow:   #fbbf24;
+    --red:      #f87171;
+    --text:     #c8d8ea;
+    --muted:    #5a7a9a;
+    --mono:     'IBM Plex Mono', monospace;
+    --sans:     'IBM Plex Sans', sans-serif;
+
+    /* Site-wide nav variables */
+    --text-primary: #c8d8ea;
+    --text-secondary: #8a9ab8;
+    --text-muted-nav: #5a7a9a;
+    --border-subtle: rgba(90, 122, 154, 0.15);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.7;
+    background-image: radial-gradient(circle, #1a3a5c44 1px, transparent 1px);
+    background-size: 28px 28px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── NAVIGATION BAR ── */
+  .nav-bar {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: rgba(8, 15, 26, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border-subtle);
+    padding: 0 24px;
+  }
+
+  .nav-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 52px;
+  }
+
+  .nav-brand {
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    color: var(--cyan);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    opacity: 0.8;
+    text-decoration: none;
+    transition: opacity 0.2s ease;
+  }
+
+  .nav-brand:hover { opacity: 1; }
+
+  .nav-links {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .nav-link {
+    font-family: var(--sans);
+    font-size: 0.85rem;
+    font-weight: 400;
+    color: var(--text-secondary);
+    text-decoration: none;
+    padding: 6px 14px;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+    letter-spacing: 0.2px;
+  }
+
+  .nav-link:hover {
+    color: var(--text-primary);
+    background: rgba(148, 163, 184, 0.08);
+  }
+
+  .nav-link.active {
+    color: var(--cyan);
+    background: rgba(0, 212, 255, 0.08);
+  }
+
+  .nav-sep {
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: var(--muted);
+    opacity: 0.4;
+    margin: 0 4px;
+  }
+
+  /* ── HEADER ── */
+  header {
+    text-align: center;
+    padding: 64px 24px 48px;
+    position: relative;
+    overflow: hidden;
+  }
+  header::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse 80% 60% at 50% 0%, #003a6622 0%, transparent 70%);
+  }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .25em;
+    text-transform: uppercase;
+    color: var(--cyan);
+    margin-bottom: 16px;
+  }
+  h1 {
+    font-size: clamp(2rem, 6vw, 4rem);
+    font-weight: 700;
+    letter-spacing: -.02em;
+    background: linear-gradient(135deg, #fff 0%, var(--cyan) 50%, var(--blue) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    line-height: 1.1;
+  }
+  .subtitle {
+    margin-top: 16px;
+    font-size: 1.05rem;
+    color: var(--muted);
+    max-width: 580px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  /* ── FLOW BAR ── */
+  .flow-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 0;
+    padding: 24px 16px 40px;
+    position: relative;
+  }
+  .flow-pill {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    padding: 5px 12px;
+    border-radius: 4px;
+    border: 1px solid;
+    white-space: nowrap;
+    cursor: default;
+    transition: transform .2s, box-shadow .2s;
+  }
+  .flow-pill:hover { transform: translateY(-2px); box-shadow: 0 6px 20px #0005; }
+  .flow-arrow {
+    color: var(--muted);
+    font-size: 13px;
+    padding: 0 4px;
+  }
+  .fp-1 { background:#00d4ff11; border-color:#00d4ff55; color:var(--cyan);  }
+  .fp-2 { background:#3b82f611; border-color:#3b82f655; color:var(--blue);  }
+  .fp-3 { background:#a78bfa11; border-color:#a78bfa55; color:var(--purple);}
+  .fp-4 { background:#22d3a511; border-color:#22d3a555; color:var(--green); }
+  .fp-5 { background:#f9731611; border-color:#f9731655; color:var(--orange);}
+  .fp-6 { background:#fbbf2411; border-color:#fbbf2455; color:var(--yellow);}
+  .fp-7 { background:#f8717111; border-color:#f8717155; color:var(--red);   }
+  .fp-8 { background:#22d3a511; border-color:#22d3a555; color:var(--green); }
+
+  /* ── MAIN LAYOUT ── */
+  main {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 0 20px 80px;
+  }
+
+  /* ── STEP CARD ── */
+  .step {
+    margin-bottom: 40px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    background: var(--surface);
+    animation: fadeUp .5s ease both;
+  }
+  @keyframes fadeUp {
+    from { opacity:0; transform: translateY(16px); }
+    to   { opacity:1; transform: translateY(0);     }
+  }
+  .step:nth-child(1)  { animation-delay:.05s }
+  .step:nth-child(2)  { animation-delay:.1s  }
+  .step:nth-child(3)  { animation-delay:.15s }
+  .step:nth-child(4)  { animation-delay:.2s  }
+  .step:nth-child(5)  { animation-delay:.25s }
+  .step:nth-child(6)  { animation-delay:.3s  }
+  .step:nth-child(7)  { animation-delay:.35s }
+  .step:nth-child(8)  { animation-delay:.4s  }
+
+  .step-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 18px 24px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    user-select: none;
+  }
+  .step-header:hover { background: #ffffff06; }
+
+  .step-num {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .15em;
+    color: var(--muted);
+    flex-shrink: 0;
+    width: 32px;
+  }
+  .step-badge {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    padding: 3px 10px;
+    border-radius: 4px;
+    border: 1px solid;
+    flex-shrink: 0;
+  }
+  .step-title {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: #e8f4ff;
+    flex: 1;
+  }
+  .step-toggle {
+    color: var(--muted);
+    font-size: 18px;
+    transition: transform .3s;
+    flex-shrink: 0;
+  }
+  .step.open .step-toggle { transform: rotate(45deg); }
+
+  .step-body {
+    padding: 0 24px;
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height .45s cubic-bezier(.4,0,.2,1), padding .3s;
+  }
+  .step.open .step-body {
+    padding: 24px;
+    max-height: 3000px;
+  }
+
+  /* ── CONTENT BLOCKS ── */
+  .explain {
+    margin-bottom: 18px;
+    color: var(--text);
+  }
+  .explain strong { color: #e8f4ff; }
+
+  .code-block {
+    background: #060d18;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px 18px;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    line-height: 1.75;
+    overflow-x: auto;
+    margin: 16px 0;
+    position: relative;
+  }
+  .code-block .label {
+    font-size: 10px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+    display: block;
+  }
+  .tk   { color: var(--cyan);   }
+  .num  { color: var(--purple);  }
+  .kw   { color: var(--orange);  }
+  .str  { color: var(--green);   }
+  .cm   { color: var(--muted);   }
+  .hi   { color: var(--yellow);  }
+  .rd   { color: var(--red);     }
+
+  /* token visualization */
+  .token-vis {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 16px 0;
+    font-family: var(--mono);
+  }
+  .tok {
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 13px;
+    border: 1px solid;
+    position: relative;
+  }
+  .tok .tok-id {
+    position: absolute;
+    top: -18px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 9px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .tok-wrap { margin-top: 22px; }
+
+  /* matrix viz */
+  .matrix {
+    display: inline-grid;
+    gap: 3px;
+    padding: 12px;
+    background: #060d18;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin: 12px 0;
+  }
+  .matrix-row { display: flex; gap: 3px; }
+  .cell {
+    width: 36px;
+    height: 26px;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--mono);
+    font-size: 9.5px;
+    color: #fff;
+  }
+
+  /* attention heatmap */
+  .attn-grid {
+    display: inline-grid;
+    gap: 2px;
+    padding: 12px;
+    background: #060d18;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin: 12px 0;
+  }
+  .attn-row { display: flex; gap: 2px; align-items: center; }
+  .attn-label { font-family: var(--mono); font-size: 9px; color: var(--muted); width: 50px; text-align: right; padding-right: 6px; }
+  .attn-cell {
+    width: 42px;
+    height: 28px;
+    border-radius: 3px;
+    font-family: var(--mono);
+    font-size: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+  }
+  .attn-col-labels { display: flex; gap: 2px; padding-left: 56px; margin-bottom: 4px; }
+  .attn-col-label { font-family: var(--mono); font-size: 9px; color: var(--muted); width: 42px; text-align: center; }
+
+  /* logits bar chart */
+  .logits {
+    margin: 16px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .logit-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .logit-tok {
+    font-family: var(--mono);
+    font-size: 11px;
+    width: 80px;
+    text-align: right;
+    color: var(--cyan);
+    flex-shrink: 0;
+  }
+  .logit-bar-wrap {
+    flex: 1;
+    height: 20px;
+    background: #060d18;
+    border-radius: 3px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .logit-bar {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 1s ease;
+    display: flex;
+    align-items: center;
+    padding-left: 8px;
+  }
+  .logit-pct {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: #fff;
+    opacity: .85;
+  }
+  .logit-val {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    width: 42px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  /* callout */
+  .callout {
+    border-left: 3px solid;
+    padding: 12px 16px;
+    border-radius: 0 6px 6px 0;
+    margin: 16px 0;
+    font-size: 14px;
+  }
+  .callout.info   { border-color: var(--blue);   background: #3b82f60d; }
+  .callout.warn   { border-color: var(--orange);  background: #f973160d; }
+  .callout.tip    { border-color: var(--green);   background: #22d3a50d; }
+  .callout.key    { border-color: var(--purple);  background: #a78bfa0d; }
+  .callout strong { color: #e8f4ff; display: block; margin-bottom: 4px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; font-family: var(--mono); }
+
+  /* section sub-header */
+  .sub { font-family: var(--mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin: 20px 0 10px; }
+
+  /* formula */
+  .formula {
+    font-family: var(--mono);
+    font-size: 13px;
+    background: #060d18;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 18px;
+    margin: 12px 0;
+    color: var(--yellow);
+    display: inline-block;
+  }
+
+  /* pipeline connector */
+  .connector {
+    text-align: center;
+    padding: 8px 0;
+    color: var(--border);
+    font-size: 22px;
+  }
+
+  /* vocab table */
+  table.vocab {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--mono);
+    font-size: 12px;
+    margin: 14px 0;
+  }
+  table.vocab th {
+    text-align: left;
+    padding: 7px 12px;
+    background: #0d1b2e;
+    color: var(--muted);
+    font-size: 10px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+  }
+  table.vocab td {
+    padding: 7px 12px;
+    border-bottom: 1px solid #0d1b2e;
+  }
+  table.vocab tr:hover td { background: #ffffff05; }
+
+  /* ── FOOTER ── */
+  footer {
+    text-align: center;
+    padding: 40px 20px;
+    font-size: 12px;
+    color: var(--muted);
+    font-family: var(--mono);
+    border-top: 1px solid var(--border);
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  /* scroll indicator */
+  .scroll-hint {
+    text-align: center;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: .1em;
+    margin-bottom: 32px;
+  }
+
+  /* ── RESPONSIVE: TABLET ── */
+  @media (max-width: 768px) {
+    .nav-inner {
+      height: auto;
+      min-height: 52px;
+      flex-wrap: wrap;
+      padding: 8px 0;
+      gap: 8px;
+    }
+    .nav-brand { font-size: 0.7rem; }
+    .nav-links {
+      width: 100%;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 2px;
+    }
+    .nav-link { font-size: 0.72rem; padding: 5px 8px; }
+    .nav-sep { display: none; }
+
+    header { padding: 48px 16px 32px; }
+    h1 { font-size: 1.5rem; }
+    .subtitle { font-size: 0.95rem; }
+    .eyebrow { font-size: 10px; }
+
+    main { padding: 0 16px 60px; }
+    .step-header { padding: 14px 16px; gap: 10px; }
+    .step.open .step-body { padding: 16px; }
+    .step-title { font-size: 0.95rem; }
+    .step-badge { font-size: 9px; padding: 2px 8px; }
+
+    .flow-bar { padding: 16px 12px 28px; }
+    .flow-pill { font-size: 9px; padding: 4px 8px; }
+    .flow-arrow { font-size: 11px; padding: 0 2px; }
+
+    .code-block { font-size: 11px; padding: 12px 14px; }
+    .formula { font-size: 11px; padding: 10px 14px; }
+
+    .matrix { padding: 8px; }
+    .cell { width: 30px; height: 22px; font-size: 8px; }
+
+    .attn-cell { width: 34px; height: 24px; font-size: 8px; }
+    .attn-label { width: 40px; font-size: 8px; }
+    .attn-col-labels { padding-left: 46px; }
+    .attn-col-label { width: 34px; font-size: 8px; }
+
+    .logit-tok { width: 65px; font-size: 10px; }
+    .logit-val { width: 36px; font-size: 9px; }
+
+    table.vocab { font-size: 10px; }
+    table.vocab th, table.vocab td { padding: 5px 8px; }
+  }
+
+  /* ── RESPONSIVE: SMALL MOBILE ── */
+  @media (max-width: 480px) {
+    .nav-bar { padding: 0 12px; }
+    .nav-link { font-size: 0.68rem; padding: 4px 6px; }
+
+    header { padding: 36px 12px 24px; }
+    h1 { font-size: 1.3rem; }
+    .subtitle { font-size: 0.85rem; }
+
+    main { padding: 0 12px 48px; }
+    .step-header { padding: 12px; gap: 8px; }
+    .step.open .step-body { padding: 12px; }
+    .step-title { font-size: 0.88rem; }
+    .step-num { width: 24px; font-size: 10px; }
+
+    .flow-pill { font-size: 8px; padding: 3px 6px; }
+    .flow-arrow { font-size: 10px; }
+
+    .code-block { font-size: 10px; padding: 10px 12px; }
+    .formula { font-size: 10px; }
+
+    .cell { width: 26px; height: 20px; font-size: 7.5px; }
+    .matrix-row .cell:first-child { width: 50px; }
+
+    .attn-cell { width: 28px; height: 20px; font-size: 7px; }
+    .attn-label { width: 34px; font-size: 7px; }
+    .attn-col-labels { padding-left: 40px; }
+    .attn-col-label { width: 28px; font-size: 7px; }
+
+    .logit-tok { width: 55px; font-size: 9px; }
+    .logit-val { display: none; }
+
+    .callout { font-size: 13px; padding: 10px 12px; }
+    .tok { font-size: 11px; padding: 3px 7px; }
+    .tok .tok-id { font-size: 8px; }
+
+    table.vocab { font-size: 9px; }
+    table.vocab th, table.vocab td { padding: 4px 6px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── NAVIGATION BAR ── -->
+<nav class="nav-bar">
+  <div class="nav-inner">
+    <a href="/" class="nav-brand">&#9889; AI Concepts</a>
+    <div class="nav-links">
+      <a href="/" class="nav-link">Neural Networks</a>
+      <div class="nav-sep"></div>
+      <a href="/rag/how-rag-works" class="nav-link">RAG Pipeline</a>
+      <div class="nav-sep"></div>
+      <a href="/transformers/how-transformers-work" class="nav-link">Transformers</a>
+      <div class="nav-sep"></div>
+      <a href="/attention-math/how-attention-works" class="nav-link">Attention Math</a>
+      <div class="nav-sep"></div>
+      <a href="/agentic-ai/how-agents-work" class="nav-link">Agentic AI</a>
+      <div class="nav-sep"></div>
+      <a href="/training/how-training-works" class="nav-link">Training Pipeline</a>
+      <div class="nav-sep"></div>
+      <a href="/ai-security/securing-ai" class="nav-link">AI Security</a>
+      <div class="nav-sep"></div>
+      <a href="/lab/lab-architecture" class="nav-link">Lab Architecture</a>
+      <div class="nav-sep"></div>
+      <a href="/token-lifecycle/life-of-a-token" class="nav-link active">Life of a Token</a>
+    </div>
+  </div>
+</nav>
+
+<header>
+  <p class="eyebrow">LLM Architecture Deep Dive</p>
+  <h1>The Life of a Token</h1>
+  <p class="subtitle">A step-by-step technical study guide — from the moment you hit Send to the first word of the response.</p>
+</header>
+
+<!-- FLOW BAR: visual pipeline overview -->
+<div class="flow-bar">
+  <span class="flow-pill fp-1">Tokenization</span>
+  <span class="flow-arrow">&rarr;</span>
+  <span class="flow-pill fp-2">Embedding</span>
+  <span class="flow-arrow">&rarr;</span>
+  <span class="flow-pill fp-3">Positional Encoding</span>
+  <span class="flow-arrow">&rarr;</span>
+  <span class="flow-pill fp-4">Attention</span>
+  <span class="flow-arrow">&rarr;</span>
+  <span class="flow-pill fp-5">Feed-Forward</span>
+  <span class="flow-arrow">&rarr;</span>
+  <span class="flow-pill fp-6">Logits / Sampling</span>
+  <span class="flow-arrow">&rarr;</span>
+  <span class="flow-pill fp-7">Autoregression</span>
+  <span class="flow-arrow">&rarr;</span>
+  <span class="flow-pill fp-8">Detokenization</span>
+</div>
+
+<main>
+  <p class="scroll-hint">&#9660; click each stage to expand &#9660;</p>
+
+  <!-- STEP 1 — TOKENIZATION -->
+  <div class="step open" id="step1">
+    <div class="step-header" onclick="toggle('step1')">
+      <span class="step-num">01</span>
+      <span class="step-badge" style="background:#00d4ff11;border-color:#00d4ff55;color:var(--cyan)">Tokenization</span>
+      <span class="step-title">Breaking text into pieces the model can process</span>
+      <span class="step-toggle">+</span>
+    </div>
+    <div class="step-body">
+
+      <p class="explain">
+        Before a language model can do <em>anything</em>, it needs to convert raw text into numbers.
+        It can't read letters — only integers. The process that does this conversion is called
+        <strong>tokenization</strong>, and the tool that does it is the <strong>tokenizer</strong>.
+      </p>
+
+      <p class="sub">What is a token?</p>
+      <p class="explain">
+        A <strong>token</strong> is not exactly a word — it's a chunk of text, typically a word,
+        a common word-fragment, or a single character. Most modern LLMs use
+        <strong>Byte-Pair Encoding (BPE)</strong> or <strong>SentencePiece</strong> to build a
+        vocabulary of ~50,000–100,000 of these chunks by merging the most common character pairs
+        during training.
+      </p>
+
+      <p class="sub">Example — tokenizing a prompt</p>
+      <p class="explain">Input text:</p>
+      <div class="code-block">
+        <span class="str">"Explain post-quantum cryptography"</span>
+      </div>
+
+      <p class="explain">After tokenization (each colored block = one token):</p>
+      <div class="token-vis tok-wrap">
+        <span class="tok" style="background:#00d4ff18;border-color:#00d4ff44;color:var(--cyan)">
+          <span class="tok-id">id: 16289</span>Explain
+        </span>
+        <span class="tok" style="background:#3b82f618;border-color:#3b82f644;color:var(--blue)">
+          <span class="tok-id">id: 1652</span>&nbsp;post
+        </span>
+        <span class="tok" style="background:#a78bfa18;border-color:#a78bfa44;color:var(--purple)">
+          <span class="tok-id">id: 12</span>-
+        </span>
+        <span class="tok" style="background:#22d3a518;border-color:#22d3a544;color:var(--green)">
+          <span class="tok-id">id: 40143</span>quantum
+        </span>
+        <span class="tok" style="background:#f9731618;border-color:#f9731644;color:var(--orange)">
+          <span class="tok-id">id: 3240</span>&nbsp;crypt
+        </span>
+        <span class="tok" style="background:#fbbf2418;border-color:#fbbf2444;color:var(--yellow)">
+          <span class="tok-id">id: 2799</span>ography
+        </span>
+      </div>
+
+      <p class="explain" style="margin-top:24px">
+        Notice <strong>"cryptography"</strong> splits into two tokens: <em>crypt</em> + <em>ography</em>.
+        This is BPE at work — the tokenizer only knows sub-word chunks it has seen during its own training.
+        Rare or technical words are almost always split further.
+      </p>
+
+      <p class="sub">The result: an integer array</p>
+      <div class="code-block">
+        <span class="cm">// what actually enters the model</span><br>
+        <span class="kw">input_ids</span> = [<span class="num">16289</span>, <span class="num">1652</span>, <span class="num">12</span>, <span class="num">40143</span>, <span class="num">3240</span>, <span class="num">2799</span>]
+      </div>
+
+      <div class="callout info">
+        <strong>Key Insight</strong>
+        The tokenizer is a completely separate, non-neural lookup table. It runs before the model
+        and after the model. The model itself never sees raw text — only integer IDs.
+      </div>
+
+      <p class="sub">Special tokens</p>
+      <p class="explain">
+        Alongside your prompt, the tokenizer inserts <strong>special control tokens</strong>:
+      </p>
+      <table class="vocab">
+        <tr><th>Token</th><th>ID (example)</th><th>Purpose</th></tr>
+        <tr><td><span class="tk">&lt;|begin_of_text|&gt;</span></td><td><span class="num">128000</span></td><td>Marks the absolute start of the sequence</td></tr>
+        <tr><td><span class="tk">&lt;|system|&gt;</span></td><td><span class="num">128006</span></td><td>Opens the system-prompt block</td></tr>
+        <tr><td><span class="tk">&lt;|user|&gt;</span></td><td><span class="num">128009</span></td><td>Opens the user-turn block</td></tr>
+        <tr><td><span class="tk">&lt;|assistant|&gt;</span></td><td><span class="num">128010</span></td><td>Signals the model to start generating</td></tr>
+        <tr><td><span class="tk">&lt;|eot_id|&gt;</span></td><td><span class="num">128001</span></td><td>End-of-turn marker (stop generating)</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- STEP 2 — TOKEN EMBEDDINGS -->
+  <div class="step" id="step2">
+    <div class="step-header" onclick="toggle('step2')">
+      <span class="step-num">02</span>
+      <span class="step-badge" style="background:#3b82f611;border-color:#3b82f655;color:var(--blue)">Embedding</span>
+      <span class="step-title">Converting integer IDs into rich numerical vectors</span>
+      <span class="step-toggle">+</span>
+    </div>
+    <div class="step-body">
+
+      <p class="explain">
+        Each integer token ID is now converted into a <strong>dense vector</strong> — an array of floating-point
+        numbers (e.g., 4,096 numbers for a mid-size model). This is done by a giant lookup table called the
+        <strong>embedding matrix</strong>, which is one of the first learned weights in the model.
+      </p>
+
+      <div class="formula">
+        E = Embedding_Matrix[ token_id ]
+        <br><span style="color:var(--muted);font-size:11px">// shape: [vocab_size &times; d_model]  e.g., [128,000 &times; 4,096]</span>
+      </div>
+
+      <p class="explain">
+        Think of the embedding matrix as a <strong>dictionary</strong> where each word has its own
+        row of ~4,096 numbers. These numbers were learned during training and encode
+        <em>semantic meaning</em> — similar concepts end up near each other in this high-dimensional space.
+      </p>
+
+      <p class="sub">What do embedding dimensions "mean"?</p>
+      <p class="explain">
+        No single dimension has a human-readable label, but researchers have found that
+        <strong>directions</strong> in embedding space correspond to concepts. For example:
+      </p>
+      <div class="code-block">
+        <span class="cm">// Famous example — vector arithmetic works:</span><br>
+        vec(<span class="str">"king"</span>) &minus; vec(<span class="str">"man"</span>) + vec(<span class="str">"woman"</span>) &asymp; vec(<span class="str">"queen"</span>)<br><br>
+        <span class="cm">// PQC example:</span><br>
+        vec(<span class="str">"ML-KEM"</span>) + vec(<span class="str">"key exchange"</span>) &asymp; vec(<span class="str">"Kyber"</span>)
+      </div>
+
+      <p class="sub">Visualizing the output shape</p>
+      <p class="explain">
+        After embedding, our 6-token input becomes a <strong>2D matrix</strong>:
+        <em>6 tokens &times; 4,096 dimensions</em>. Only the first few dimensions shown:
+      </p>
+      <div class="matrix">
+        <div class="matrix-row">
+          <div class="cell" style="background:transparent;color:var(--muted);font-size:9px;width:70px">Token</div>
+          <div class="cell" style="background:transparent;color:var(--muted);font-size:9px">dim&#8320;</div>
+          <div class="cell" style="background:transparent;color:var(--muted);font-size:9px">dim&#8321;</div>
+          <div class="cell" style="background:transparent;color:var(--muted);font-size:9px">dim&#8322;</div>
+          <div class="cell" style="background:transparent;color:var(--muted);font-size:9px">dim&#8323;</div>
+          <div class="cell" style="background:transparent;color:var(--muted);font-size:9px">&hellip;</div>
+        </div>
+        <div class="matrix-row">
+          <div class="cell" style="background:transparent;color:var(--cyan);width:70px;font-size:9px">Explain</div>
+          <div class="cell" style="background:#1a3a5c"> .31</div>
+          <div class="cell" style="background:#2a1a5c">&minus;.07</div>
+          <div class="cell" style="background:#1a3a2c"> .52</div>
+          <div class="cell" style="background:#3a2a1c"> .19</div>
+          <div class="cell" style="background:transparent;color:var(--muted)">&hellip;</div>
+        </div>
+        <div class="matrix-row">
+          <div class="cell" style="background:transparent;color:var(--blue);width:70px;font-size:9px">post</div>
+          <div class="cell" style="background:#2a1a5c">&minus;.18</div>
+          <div class="cell" style="background:#1a3a5c"> .44</div>
+          <div class="cell" style="background:#2a2a1c"> .08</div>
+          <div class="cell" style="background:#1a4a3c"> .63</div>
+          <div class="cell" style="background:transparent;color:var(--muted)">&hellip;</div>
+        </div>
+        <div class="matrix-row">
+          <div class="cell" style="background:transparent;color:var(--green);width:70px;font-size:9px">quantum</div>
+          <div class="cell" style="background:#1a4a3c"> .71</div>
+          <div class="cell" style="background:#1a3a5c"> .22</div>
+          <div class="cell" style="background:#2a1a5c">&minus;.34</div>
+          <div class="cell" style="background:#1a3a3c"> .51</div>
+          <div class="cell" style="background:transparent;color:var(--muted)">&hellip;</div>
+        </div>
+        <div class="matrix-row">
+          <div class="cell" style="background:transparent;color:var(--orange);width:70px;font-size:9px">crypt</div>
+          <div class="cell" style="background:#3a1a1c">&minus;.42</div>
+          <div class="cell" style="background:#1a4a3c"> .67</div>
+          <div class="cell" style="background:#1a3a5c"> .15</div>
+          <div class="cell" style="background:#2a3a1c"> .38</div>
+          <div class="cell" style="background:transparent;color:var(--muted)">&hellip;</div>
+        </div>
+      </div>
+
+      <div class="callout tip">
+        <strong>Why not just use the token ID directly?</strong>
+        An integer ID like 40143 carries no meaning — it's just an arbitrary label.
+        Embeddings turn that label into a <em>point in semantic space</em> that encodes
+        relationships between concepts. This is the foundation of everything that follows.
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 3 — POSITIONAL ENCODING -->
+  <div class="step" id="step3">
+    <div class="step-header" onclick="toggle('step3')">
+      <span class="step-num">03</span>
+      <span class="step-badge" style="background:#a78bfa11;border-color:#a78bfa55;color:var(--purple)">Positional Encoding</span>
+      <span class="step-title">Teaching the model where each token sits in the sequence</span>
+      <span class="step-toggle">+</span>
+    </div>
+    <div class="step-body">
+
+      <p class="explain">
+        Self-attention (the next step) treats all tokens equally — it has no built-in
+        sense of order. Without extra information, "dog bites man" and "man bites dog"
+        would produce identical embeddings. <strong>Positional encoding</strong> solves
+        this by adding a position-specific signal to each token vector.
+      </p>
+
+      <p class="sub">Two common approaches</p>
+
+      <div class="callout key">
+        <strong>1. Sinusoidal (original Transformer)</strong>
+        A fixed mathematical formula using sine and cosine waves at different frequencies
+        is added to the embedding. The pattern is unique for each position, and the waves
+        allow the model to learn relative distance relationships.
+      </div>
+
+      <div class="callout key">
+        <strong>2. RoPE — Rotary Positional Embedding (modern LLMs)</strong>
+        Instead of adding a fixed vector, RoPE <em>rotates</em> the Q and K vectors
+        inside the attention mechanism by an angle proportional to position. This encodes
+        relative positions more efficiently and generalizes better to longer contexts.
+      </div>
+
+      <div class="formula">
+        final_vector[pos] = embedding[token_id] + positional_signal[pos]
+      </div>
+
+      <p class="explain">
+        The output is still the same shape — <strong>6 &times; 4,096</strong> — but now each vector
+        carries both <em>what this token means</em> and <em>where it appears</em> in the sequence.
+      </p>
+
+      <div class="callout info">
+        <strong>Context Window</strong>
+        The maximum number of positions a model can encode is its <strong>context window</strong>
+        (e.g., 128K tokens for Claude). Beyond this limit, positional encoding simply wasn't
+        trained and output becomes unreliable.
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 4 — SELF-ATTENTION -->
+  <div class="step" id="step4">
+    <div class="step-header" onclick="toggle('step4')">
+      <span class="step-num">04</span>
+      <span class="step-badge" style="background:#22d3a511;border-color:#22d3a555;color:var(--green)">Multi-Head Attention</span>
+      <span class="step-title">Every token "looks at" every other token simultaneously</span>
+      <span class="step-toggle">+</span>
+    </div>
+    <div class="step-body">
+
+      <p class="explain">
+        This is the core innovation of the Transformer architecture.
+        <strong>Self-attention</strong> lets each token decide how much "importance" to assign to
+        every other token when computing its own updated representation. The word "bank" in
+        "river bank" attends heavily to "river"; in "bank account" it attends to "account."
+      </p>
+
+      <p class="sub">Step 4a — Compute Q, K, V matrices</p>
+      <p class="explain">
+        The embedding of each token is projected into three different vectors using three
+        learned weight matrices: <strong>Query (Q)</strong>, <strong>Key (K)</strong>,
+        and <strong>Value (V)</strong>.
+      </p>
+      <div class="formula">
+        Q = X &middot; W_Q &nbsp;|&nbsp; K = X &middot; W_K &nbsp;|&nbsp; V = X &middot; W_V
+        <br><span style="color:var(--muted);font-size:11px">
+          X = input matrix [seq_len &times; d_model] &nbsp;|&nbsp;
+          W_Q, W_K, W_V = learned weights [d_model &times; d_k]
+        </span>
+      </div>
+
+      <div class="callout info">
+        <strong>Q / K / V Intuition</strong>
+        Think of it like a search engine: <br>
+        &bull; <strong>Q (Query)</strong> = "What am I looking for?" — sent by the current token<br>
+        &bull; <strong>K (Key)</strong> = "What do I have to offer?" — advertised by every token<br>
+        &bull; <strong>V (Value)</strong> = "Here's my actual content" — retrieved when attention is high
+      </div>
+
+      <p class="sub">Step 4b — Compute attention scores</p>
+      <p class="explain">
+        The Query of each token is dot-producted against the Keys of all other tokens.
+        A high dot product means "these two tokens are relevant to each other."
+        The result is scaled and passed through softmax to produce a probability distribution.
+      </p>
+      <div class="formula">
+        Attention(Q, K, V) = softmax( Q&middot;K&#7488; / &radic;d_k ) &middot; V
+      </div>
+      <p class="explain">
+        The <strong>&radic;d_k scaling</strong> (square root of the key dimension) prevents dot products
+        from growing so large that softmax produces near-zero gradients during training.
+      </p>
+
+      <p class="sub">Attention heatmap — "cryptography" attending to context</p>
+      <p class="explain" style="font-size:13px;color:var(--muted)">
+        Rows = query token &nbsp;|&nbsp; Columns = key tokens being attended to &nbsp;|&nbsp; Darker = higher attention weight
+      </p>
+
+      <div class="attn-grid">
+        <div class="attn-col-labels">
+          <div class="attn-col-label">Explain</div>
+          <div class="attn-col-label">post</div>
+          <div class="attn-col-label">-</div>
+          <div class="attn-col-label">quantum</div>
+          <div class="attn-col-label">crypt</div>
+          <div class="attn-col-label">ography</div>
+        </div>
+        <div class="attn-row">
+          <div class="attn-label">Explain</div>
+          <div class="attn-cell" style="background:rgba(0,212,255,0.75)">0.72</div>
+          <div class="attn-cell" style="background:rgba(0,212,255,0.10)">0.08</div>
+          <div class="attn-cell" style="background:rgba(0,212,255,0.05)">0.03</div>
+          <div class="attn-cell" style="background:rgba(0,212,255,0.12)">0.09</div>
+          <div class="attn-cell" style="background:rgba(0,212,255,0.06)">0.05</div>
+          <div class="attn-cell" style="background:rgba(0,212,255,0.04)">0.03</div>
+        </div>
+        <div class="attn-row">
+          <div class="attn-label">quantum</div>
+          <div class="attn-cell" style="background:rgba(34,211,165,0.08)">0.05</div>
+          <div class="attn-cell" style="background:rgba(34,211,165,0.20)">0.15</div>
+          <div class="attn-cell" style="background:rgba(34,211,165,0.04)">0.02</div>
+          <div class="attn-cell" style="background:rgba(34,211,165,0.78)">0.68</div>
+          <div class="attn-cell" style="background:rgba(34,211,165,0.12)">0.07</div>
+          <div class="attn-cell" style="background:rgba(34,211,165,0.05)">0.03</div>
+        </div>
+        <div class="attn-row">
+          <div class="attn-label">crypt</div>
+          <div class="attn-cell" style="background:rgba(249,115,22,0.06)">0.04</div>
+          <div class="attn-cell" style="background:rgba(249,115,22,0.10)">0.07</div>
+          <div class="attn-cell" style="background:rgba(249,115,22,0.03)">0.02</div>
+          <div class="attn-cell" style="background:rgba(249,115,22,0.25)">0.20</div>
+          <div class="attn-cell" style="background:rgba(249,115,22,0.78)">0.62</div>
+          <div class="attn-cell" style="background:rgba(249,115,22,0.07)">0.05</div>
+        </div>
+        <div class="attn-row">
+          <div class="attn-label">ography</div>
+          <div class="attn-cell" style="background:rgba(167,139,250,0.04)">0.03</div>
+          <div class="attn-cell" style="background:rgba(167,139,250,0.05)">0.04</div>
+          <div class="attn-cell" style="background:rgba(167,139,250,0.03)">0.02</div>
+          <div class="attn-cell" style="background:rgba(167,139,250,0.15)">0.12</div>
+          <div class="attn-cell" style="background:rgba(167,139,250,0.90)">0.75</div>
+          <div class="attn-cell" style="background:rgba(167,139,250,0.06)">0.04</div>
+        </div>
+      </div>
+
+      <p class="explain" style="margin-top:8px">
+        You can see <strong>"ography"</strong> attends heavily to <strong>"crypt"</strong> because
+        it knows it's the second half of the same word. <strong>"quantum"</strong> strongly attends
+        to itself because it's a key domain concept.
+      </p>
+
+      <p class="sub">Step 4c — Multi-head attention</p>
+      <p class="explain">
+        Instead of running attention once, modern models run it <strong>N times in parallel</strong>
+        (e.g., 32 heads), each with its own W_Q, W_K, W_V weights. Each head learns to track a
+        different type of relationship: one head might track syntactic structure, another tracks
+        coreference (which pronoun refers to which noun), another semantic similarity.
+        The results are concatenated and projected back to d_model.
+      </p>
+      <div class="formula">
+        MultiHead(Q,K,V) = Concat(head&#8321;, head&#8322;, &hellip;, head&#8345;) &middot; W_O
+        <br><span style="color:var(--muted);font-size:11px">W_O = output projection matrix [n_heads&middot;d_k &times; d_model]</span>
+      </div>
+
+      <div class="callout warn">
+        <strong>Causal Masking (decoder models)</strong>
+        When generating text, the model must NOT look at future tokens — it hasn't generated them yet.
+        A <strong>causal mask</strong> zeroes out all attention weights above the diagonal of the
+        attention matrix, forcing each token to only attend to itself and previous tokens.
+        This is what makes autoregressive generation possible.
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 5 — FEED-FORWARD NETWORK + RESIDUALS -->
+  <div class="step" id="step5">
+    <div class="step-header" onclick="toggle('step5')">
+      <span class="step-num">05</span>
+      <span class="step-badge" style="background:#f9731611;border-color:#f9731655;color:var(--orange)">Feed-Forward + Residuals</span>
+      <span class="step-title">Non-linear transformations and stabilization</span>
+      <span class="step-toggle">+</span>
+    </div>
+    <div class="step-body">
+
+      <p class="explain">
+        After attention, each token's vector passes through a <strong>Feed-Forward Network (FFN)</strong>
+        — two linear layers with a non-linear activation in between. This layer operates
+        <em>independently</em> on each token — no cross-token communication here. It acts like the
+        model's "memory bank," storing factual knowledge learned during training.
+      </p>
+
+      <div class="formula">
+        FFN(x) = max(0, x&middot;W&#8321; + b&#8321;) &middot; W&#8322; + b&#8322;
+        <br><span style="color:var(--muted);font-size:11px">
+          W&#8321;: [d_model &times; d_ff] &nbsp;|&nbsp; d_ff is typically 4&times; d_model (e.g., 16,384)
+        </span>
+      </div>
+
+      <p class="sub">Residual Connections</p>
+      <p class="explain">
+        After both attention and FFN, the original input is <strong>added back</strong> to the output.
+        This "skip connection" solves the vanishing gradient problem in deep networks and ensures
+        that information can flow through many layers without degrading.
+      </p>
+      <div class="formula">
+        output = LayerNorm( x + Sublayer(x) )
+        <br><span style="color:var(--muted);font-size:11px">x = input to sublayer &nbsp;|&nbsp; Sublayer = Attention OR FFN</span>
+      </div>
+
+      <p class="sub">Layer Normalization</p>
+      <p class="explain">
+        Before (or after) each sublayer, <strong>LayerNorm</strong> normalizes the values across
+        the embedding dimension to have mean=0 and std=1. This stabilizes training by preventing
+        activations from exploding or vanishing as they pass through 80+ layers.
+      </p>
+
+      <p class="sub">One full Transformer block = Attention + FFN + two LayerNorms</p>
+      <div class="code-block">
+        <span class="cm">// A single Transformer layer (pseudocode)</span><br>
+        <span class="kw">def</span> transformer_block(x):<br>
+        &nbsp;&nbsp;x = x + <span class="str">MultiHeadAttention</span>(<span class="hi">LayerNorm</span>(x))  <span class="cm"># attention + residual</span><br>
+        &nbsp;&nbsp;x = x + <span class="str">FeedForward</span>(<span class="hi">LayerNorm</span>(x))     <span class="cm"># FFN + residual</span><br>
+        &nbsp;&nbsp;<span class="kw">return</span> x
+      </div>
+
+      <p class="explain">
+        This block is stacked <strong>32–96 times</strong> (depending on model size).
+        Each layer refines the token representations, adding progressively more abstract understanding.
+        Early layers handle syntax; later layers handle semantics, reasoning, and world knowledge.
+      </p>
+
+      <div class="callout tip">
+        <strong>Why so many layers?</strong>
+        Research shows that depth matters more than width for reasoning ability.
+        GPT-4 class models likely have 96–128 layers. Each pass through a layer
+        costs roughly the same compute, but each layer adds a "level of abstraction"
+        to the model's understanding.
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 6 — LOGITS & SAMPLING -->
+  <div class="step" id="step6">
+    <div class="step-header" onclick="toggle('step6')">
+      <span class="step-num">06</span>
+      <span class="step-badge" style="background:#fbbf2411;border-color:#fbbf2455;color:var(--yellow)">Logits &amp; Sampling</span>
+      <span class="step-title">Turning the final vector into a "next token" probability</span>
+      <span class="step-toggle">+</span>
+    </div>
+    <div class="step-body">
+
+      <p class="explain">
+        After all N transformer layers, the vector for the <strong>last token position</strong> is
+        projected through a final linear layer — the <strong>LM Head</strong> — which produces
+        a score (called a <strong>logit</strong>) for every token in the entire vocabulary.
+        These are then converted to probabilities via softmax.
+      </p>
+
+      <div class="formula">
+        logits = final_hidden_state &middot; W_vocab<br>
+        probs = softmax(logits / temperature)
+        <br><span style="color:var(--muted);font-size:11px">
+          W_vocab: [d_model &times; vocab_size] &nbsp;|&nbsp; output shape: [vocab_size]  e.g., [128,000]
+        </span>
+      </div>
+
+      <p class="sub">Probability distribution over vocabulary (top candidates)</p>
+      <p class="explain" style="font-size:13px;color:var(--muted)">
+        Model has processed "Explain post-quantum" — what token comes next?
+      </p>
+
+      <div class="logits">
+        <div class="logit-row">
+          <div class="logit-tok">cryptography</div>
+          <div class="logit-bar-wrap"><div class="logit-bar" style="width:72%;background:linear-gradient(90deg,var(--green),#1a9a6a)"><span class="logit-pct">72.1%</span></div></div>
+          <div class="logit-val">8.84</div>
+        </div>
+        <div class="logit-row">
+          <div class="logit-tok">computing</div>
+          <div class="logit-bar-wrap"><div class="logit-bar" style="width:14%;background:linear-gradient(90deg,var(--blue),#2060c0)"><span class="logit-pct">14.2%</span></div></div>
+          <div class="logit-val">6.12</div>
+        </div>
+        <div class="logit-row">
+          <div class="logit-tok">algorithms</div>
+          <div class="logit-bar-wrap"><div class="logit-bar" style="width:7%;background:linear-gradient(90deg,var(--purple),#7060c0)"><span class="logit-pct">7.3%</span></div></div>
+          <div class="logit-val">5.43</div>
+        </div>
+        <div class="logit-row">
+          <div class="logit-tok">threats</div>
+          <div class="logit-bar-wrap"><div class="logit-bar" style="width:3%;background:linear-gradient(90deg,var(--orange),#c05020)"><span class="logit-pct">3.1%</span></div></div>
+          <div class="logit-val">4.21</div>
+        </div>
+        <div class="logit-row">
+          <div class="logit-tok">security</div>
+          <div class="logit-bar-wrap"><div class="logit-bar" style="width:2%;background:linear-gradient(90deg,var(--yellow),#c09000)"><span class="logit-pct">2.1%</span></div></div>
+          <div class="logit-val">3.87</div>
+        </div>
+        <div class="logit-row">
+          <div class="logit-tok">&hellip; (127,995 others)</div>
+          <div class="logit-bar-wrap"><div class="logit-bar" style="width:1%;background:var(--border)"><span class="logit-pct">1.2%</span></div></div>
+          <div class="logit-val">&mdash;</div>
+        </div>
+      </div>
+
+      <p class="sub">Sampling strategies</p>
+      <p class="explain">
+        The model doesn't always pick the highest-probability token. Several parameters control this:
+      </p>
+
+      <div class="callout key">
+        <strong>Temperature</strong>
+        Divides all logits before softmax. <br>
+        &bull; <code>temperature=0.0</code> &rarr; always pick the top token (deterministic, greedy)<br>
+        &bull; <code>temperature=1.0</code> &rarr; sample proportional to raw probabilities (default)<br>
+        &bull; <code>temperature=2.0</code> &rarr; flatten the distribution, more "creative" and random
+      </div>
+
+      <div class="callout key">
+        <strong>Top-P (Nucleus Sampling)</strong>
+        Sort tokens by probability. Only consider the smallest set of tokens whose
+        cumulative probability exceeds P (e.g., 0.9). Sample from that nucleus.
+        This prevents the model from picking absurd low-probability tokens while
+        preserving diversity within plausible choices.
+      </div>
+
+      <div class="callout key">
+        <strong>Top-K</strong>
+        Only consider the K highest-probability tokens (e.g., top 50). Simpler than Top-P
+        but less adaptive — a uniform top-50 cutoff may be too narrow or too broad depending
+        on how peaked the distribution is.
+      </div>
+
+      <div class="callout warn">
+        <strong>Greedy vs. Sampling</strong>
+        Always picking the highest-probability token (greedy) leads to repetitive, boring text.
+        Sampling introduces controlled randomness that makes responses feel natural and varied —
+        but set temperature too high and you get word salad.
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 7 — AUTOREGRESSIVE GENERATION -->
+  <div class="step" id="step7">
+    <div class="step-header" onclick="toggle('step7')">
+      <span class="step-num">07</span>
+      <span class="step-badge" style="background:#f8717111;border-color:#f8717155;color:var(--red)">Autoregression</span>
+      <span class="step-title">The output loop — one token at a time</span>
+      <span class="step-toggle">+</span>
+    </div>
+    <div class="step-body">
+
+      <p class="explain">
+        The model does not produce the entire response in one shot. It generates
+        <strong>one token at a time</strong>, then feeds that token back into the input
+        alongside everything that came before. This loop runs until the model produces
+        the <em>end-of-sequence</em> token or hits the maximum token limit.
+      </p>
+
+      <div class="code-block">
+        <span class="label">pseudocode — the generation loop</span>
+        <span class="kw">input_ids</span> = tokenize(prompt)<br><br>
+        <span class="kw">while</span> <span class="hi">not_done</span>:<br>
+        &nbsp;&nbsp;<span class="cm"># 1. Run the full forward pass</span><br>
+        &nbsp;&nbsp;<span class="str">logits</span> = model.forward(input_ids)<br><br>
+        &nbsp;&nbsp;<span class="cm"># 2. Look at ONLY the last position's logits</span><br>
+        &nbsp;&nbsp;<span class="str">next_token_logits</span> = logits[<span class="rd">-1</span>]<br><br>
+        &nbsp;&nbsp;<span class="cm"># 3. Apply temperature + sample</span><br>
+        &nbsp;&nbsp;<span class="str">next_token_id</span> = sample(next_token_logits, temp=<span class="num">0.7</span>)<br><br>
+        &nbsp;&nbsp;<span class="cm"># 4. Append the new token and repeat</span><br>
+        &nbsp;&nbsp;input_ids = input_ids + [next_token_id]<br><br>
+        &nbsp;&nbsp;<span class="cm"># 5. Stop when EOS token is produced</span><br>
+        &nbsp;&nbsp;<span class="kw">if</span> next_token_id == <span class="hi">EOS_TOKEN</span>: <span class="kw">break</span>
+      </div>
+
+      <p class="sub">KV-Cache — the critical optimization</p>
+      <p class="explain">
+        Running the full forward pass on ALL previous tokens for every single new token would be
+        extremely slow. The <strong>KV-Cache</strong> optimization stores the computed
+        Key and Value matrices from previous steps so only the <em>new</em> token needs to be
+        processed from scratch each iteration.
+      </p>
+
+      <div class="callout tip">
+        <strong>Why streaming works</strong>
+        Because the model produces one token at a time anyway, the API can stream each
+        token back to your screen the moment it's sampled — which is why you see responses
+        "typing out" word-by-word rather than appearing all at once.
+      </div>
+
+      <p class="sub">Cost model</p>
+      <div class="code-block">
+        <span class="cm">// Compute cost scales with BOTH prompt length AND output length</span><br>
+        cost = (prompt_tokens &times; prefill_cost) + (output_tokens &times; decode_cost)<br><br>
+        <span class="cm">// Prefill: process all prompt tokens in parallel (fast)</span><br>
+        <span class="cm">// Decode:  one token at a time (slower, memory-bandwidth bound)</span>
+      </div>
+
+      <p class="explain">
+        This is why long outputs cost more than long prompts of the same total token count —
+        decode time is serial, while prefill is parallel.
+      </p>
+    </div>
+  </div>
+
+  <!-- STEP 8 — DETOKENIZATION -->
+  <div class="step" id="step8">
+    <div class="step-header" onclick="toggle('step8')">
+      <span class="step-num">08</span>
+      <span class="step-badge" style="background:#22d3a511;border-color:#22d3a555;color:var(--green)">Detokenization</span>
+      <span class="step-title">Converting integer IDs back into human-readable text</span>
+      <span class="step-toggle">+</span>
+    </div>
+    <div class="step-body">
+
+      <p class="explain">
+        Once the generation loop finishes, the stream of output token IDs is passed back through
+        the tokenizer in reverse — the <strong>detokenizer</strong> maps each ID to its text fragment
+        and concatenates them into the final response string.
+      </p>
+
+      <div class="code-block">
+        <span class="cm">// Output token IDs from the generation loop:</span><br>
+        output_ids = [<span class="num">2249</span>, <span class="num">9942</span>, <span class="num">32</span>, <span class="num">40143</span>, <span class="num">3240</span>, <span class="num">2799</span>, <span class="num">374</span>, <span class="num">264</span>, ...]<br><br>
+        <span class="cm">// Detokenize (reverse lookup + join):</span><br>
+        text = tokenizer.decode(output_ids)<br>
+        <span class="cm">// &rarr; "Post-quantum cryptography is a ..."</span>
+      </div>
+
+      <p class="sub">Byte-level cleanup</p>
+      <p class="explain">
+        Some tokenizers work at the byte level and include special handling for spaces — e.g.,
+        SentencePiece uses a special "&#9601;" character to mark tokens that follow a space.
+        The detokenizer strips these artifacts and reconstructs proper spacing and punctuation.
+      </p>
+
+      <div class="callout tip">
+        <strong>What the user sees</strong>
+        The browser/app receives these text fragments via a streaming API response
+        (Server-Sent Events or WebSocket) and appends them to the chat window in real time —
+        which is exactly what you're watching when a response "types itself out."
+      </div>
+    </div>
+  </div>
+
+  <!-- BONUS — END-TO-END SUMMARY -->
+  <div class="step" id="step9">
+    <div class="step-header" onclick="toggle('step9')">
+      <span class="step-num">&#9673;</span>
+      <span class="step-badge" style="background:#ffffff11;border-color:#ffffff33;color:#fff">End-to-End</span>
+      <span class="step-title">The complete picture — annotated pipeline</span>
+      <span class="step-toggle">+</span>
+    </div>
+    <div class="step-body">
+      <div class="code-block" style="font-size:12px;line-height:1.9">
+        <span class="label">complete forward pass — annotated</span>
+
+        <span class="cm">&#9484;&#9472; INPUT &#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;</span><br>
+        <span class="cm">&#9474;</span> <span class="str">"Explain post-quantum cryptography"</span>  <span class="cm">&larr; raw text string</span><br>
+        <span class="cm">&#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;</span><br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">&darr; TOKENIZER</span><br>
+        <span class="hi">[16289, 1652, 12, 40143, 3240, 2799]</span> <span class="cm">&larr; integer token IDs</span><br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">&darr; EMBEDDING TABLE</span><br>
+        <span class="hi">shape: [6 &times; 4096]</span>   <span class="cm">&larr; dense float vectors (6 tokens, 4096 dims)</span><br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">&darr; POSITIONAL ENCODING (RoPE)</span><br>
+        <span class="hi">shape: [6 &times; 4096]</span>   <span class="cm">&larr; position information baked in</span><br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">&darr; TRANSFORMER LAYERS (&times;32–96)</span><br>
+        <span class="cm">  &#9484;&#9472;&#9472; LayerNorm &rarr; Multi-Head Self-Attention &rarr; Residual</span><br>
+        <span class="cm">  &#9492;&#9472;&#9472; LayerNorm &rarr; Feed-Forward Network (&times;4 wider) &rarr; Residual</span><br>
+        <span class="hi">shape: [6 &times; 4096]</span>   <span class="cm">&larr; same shape, richer representations</span><br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">&darr; FINAL LAYERNORM</span><br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">&darr; LM HEAD (linear projection)</span><br>
+        <span class="hi">shape: [128,000]</span>     <span class="cm">&larr; raw logit score per vocabulary token</span><br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">&darr; SOFTMAX + TEMPERATURE + TOP-P</span><br>
+        <span class="hi">shape: [128,000]</span>     <span class="cm">&larr; probability distribution</span><br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">&darr; SAMPLE ONE TOKEN</span><br>
+        <span class="hi">token_id = 3240</span>     <span class="cm">&larr; e.g., "crypt" wins the lottery</span><br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">&darr; APPEND TO INPUT &amp; REPEAT</span><br>
+        <span class="cm">&#9484;&#9472; OUTPUT (after N iterations) &#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;</span><br>
+        <span class="cm">&#9474;</span> <span class="str">"Post-quantum cryptography is a branch of cryptography..."</span><br>
+        <span class="cm">&#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;</span>
+      </div>
+
+      <p class="sub">Key numbers — reference card</p>
+      <table class="vocab" style="font-size:11.5px">
+        <tr><th>Quantity</th><th>Small (7B)</th><th>Medium (70B)</th><th>Large (GPT-4 class)</th></tr>
+        <tr><td>Parameters</td><td>7 billion</td><td>70 billion</td><td>~1 trillion</td></tr>
+        <tr><td>d_model (embedding dim)</td><td>4,096</td><td>8,192</td><td>~12,288</td></tr>
+        <tr><td>Transformer layers</td><td>32</td><td>80</td><td>96–128</td></tr>
+        <tr><td>Attention heads</td><td>32</td><td>64</td><td>96</td></tr>
+        <tr><td>d_ff (FFN width)</td><td>11,008</td><td>28,672</td><td>~49,152</td></tr>
+        <tr><td>Vocabulary size</td><td>32,000–128,000</td><td>128,000</td><td>100,000+</td></tr>
+        <tr><td>Context window</td><td>8K–128K tokens</td><td>128K tokens</td><td>128K–1M+</td></tr>
+        <tr><td>Tokens per second (decode)</td><td>50–100 tok/s</td><td>20–40 tok/s</td><td>10–20 tok/s</td></tr>
+      </table>
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  THE LIFE OF A TOKEN &nbsp;&middot;&nbsp; LLM Architecture Study Guide &nbsp;&middot;&nbsp; Prompt &rarr; Tokens &rarr; Embeddings &rarr; Attention &rarr; FFN &rarr; Logits &rarr; Sample &rarr; Decode
+</footer>
+
+<script>
+  function toggle(id) {
+    const el = document.getElementById(id);
+    el.classList.toggle('open');
+  }
+
+  // Animate logit bars on first open of step6
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.querySelectorAll('.logit-bar').forEach(bar => {
+          const w = bar.style.width;
+          bar.style.width = '0';
+          setTimeout(() => { bar.style.width = w; }, 100);
+        });
+        observer.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.3 });
+
+  const step6 = document.getElementById('step6');
+  if (step6) observer.observe(step6);
+</script>
+</body>
+</html>
